@@ -1,0 +1,157 @@
+= pam_fnal_vncpasswd(8)
+
+== Name
+
+pam_fnal_vncpasswd - PAM module for per-user VNC password authentication
+
+== Synopsis
+
+----
+pam_fnal_vncpasswd.so [debug]
+----
+
+== Description
+
+*pam_fnal_vncpasswd* authenticates a user against a per-user VNC password file
+managed by *@PROJECT_NAME@*(1).  It is designed to run exclusively inside a
+single-user VNC session process (for example, *neatvnc* under *weston*) that
+runs as the session owner.
+
+The module reads a *crypt*(3) hash stored in
+*~/@VNC_PASSWD_DIR@/@VNC_PASSWD_FILENAME@*, verifies the supplied password
+using a constant-time comparison, and zeroes all sensitive buffers before
+returning.
+
+=== Session Binding
+
+Because the VNC session process runs as the authenticated user, this module
+compares the UID resolved from the supplied username against *getuid*(2) of
+the calling process.  A mismatch causes *PAM_AUTH_ERR* before any password
+file is opened.
+
+*This module must not be deployed in multi-user PAM services* (such as *sshd*
+or *login*) where the process runs as root.  In that context *getuid*(2)
+returns 0 and the binding check would reject every non-root user.
+
+=== Password File Validation
+
+The password file is opened with *O_NOFOLLOW | O_NONBLOCK* to prevent
+symlink-swap and FIFO blocking attacks.  After opening, *fstat*(2) verifies:
+
+* The file is a regular file.
+* The file is owned by the session user.
+* No executable or group/world read-write bits are set.
+
+=== Authentication Sequence
+
+. Resolve the home directory via *getpwnam_r*(3).
+. Reject if the resolved UID does not equal *getuid*(2).
+. Construct the canonical password file path.
+. Open and validate the password file (TOCTOU-safe).
+. Read the stored hash.
+. Verify the supplied password using a constant-time comparison
+  (*CRYPTO_memcmp* or *gnutls_memcmp* depending on build configuration).
+. Call *explicit_bzero*(3) on all sensitive buffers.
+
+== Options
+
+*debug*::
+  Emit non-sensitive decision-point messages to *syslog*(3) at *LOG_DEBUG*.
+  Passwords, hashes, and raw file contents are never logged.
+
+== PAM Stack Configuration
+
+=== Recommended Configuration
+
+The following configuration authenticates with the VNC password when present
+and falls back to *pam_unix*(8) when the user has no VNC password file:
+
+----
+# /etc/pam.d/your-vnc-service
+auth [success=done authinfo_unavail=ignore default=die] \
+    pam_fnal_vncpasswd.so
+auth sufficient pam_unix.so
+----
+
+The bracket syntax is required because *sufficient* treats
+*PAM_AUTHINFO_UNAVAIL* as failure and will not fall through to *pam_unix*.
+
+*authinfo_unavail=ignore*;;
+  Skip to the next module when the user has no VNC password file.
+*success=done*;;
+  Short-circuit the stack on successful VNC authentication.
+*default=die*;;
+  Terminate the stack on any other failure, including *PAM_AUTH_ERR* and
+  *PAM_USER_UNKNOWN*.  This prevents an attacker from deliberately triggering
+  an error to bypass a VNC password that is present.
+
+=== Debug Configuration
+
+----
+auth [success=done authinfo_unavail=ignore default=die] \
+    pam_fnal_vncpasswd.so debug
+auth sufficient pam_unix.so
+----
+
+== Return Values
+
+*PAM_SUCCESS*::
+  The supplied password matches the stored hash.
+
+*PAM_AUTH_ERR*::
+  Authentication failed: session binding check failed, or the supplied
+  password does not match the stored hash.
+
+*PAM_USER_UNKNOWN*::
+  The username was not found in the system password database, or the passwd
+  entry has no valid home directory.
+
+*PAM_AUTHINFO_UNAVAIL*::
+  The password file could not be opened or validated, or the stored hash
+  could not be read.  The *authinfo_unavail=ignore* action in the PAM stack
+  configuration is intended to handle this case.
+
+*PAM_PERM_DENIED*::
+  Returned by *pam_sm_chauthtok*(3) — password changes via PAM are not
+  supported.  Use *@PROJECT_NAME@*(1) instead.
+
+*PAM_SERVICE_ERR*::
+  Returned by *pam_sm_acct_mgmt*(3), *pam_sm_open_session*(3), and
+  *pam_sm_close_session*(3) — this module implements only password
+  authentication.
+
+*PAM_IGNORE*::
+  Returned by *pam_sm_setcred*(3) — this module manages no credentials.
+
+== Password File
+
+----
+~/@VNC_PASSWD_DIR@/@VNC_PASSWD_FILENAME@
+----
+
+A single line containing a *crypt*(3) hash produced by *@PROJECT_NAME@*(1).
+The file must be owned by the user, not a symlink, and have permissions
+*0600* (no execute, no group or world access).
+
+Use *@PROJECT_NAME@*(1) to create and update this file.
+
+== Files
+
+*~/@VNC_PASSWD_DIR@/@VNC_PASSWD_FILENAME@*::
+  Per-user VNC password file.
+
+== Notes
+
+The *pam_sm_chauthtok*, *pam_sm_acct_mgmt*, *pam_sm_open_session*, and
+*pam_sm_close_session* entry points exist because Linux-PAM resolves all six
+*pam_sm_** symbols at *dlopen*(3) time.  A missing symbol breaks the entire
+auth stack regardless of which service types appear in the PAM configuration.
+
+== See Also
+
+*@PROJECT_NAME@*(1), *pam*(8), *pam.conf*(5), *pam_unix*(8),
+*crypt*(3), *crypt_r*(3), *pam_syslog*(3), *getpwnam_r*(3)
+
+== Authors
+
+Fermi Forward Discovery Group

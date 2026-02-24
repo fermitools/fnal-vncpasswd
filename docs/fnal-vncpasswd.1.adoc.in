@@ -1,0 +1,115 @@
+= @PROJECT_NAME@(1)
+
+== Name
+
+@PROJECT_NAME@ - set the per-user VNC password for pam_fnal_vncpasswd
+
+== Synopsis
+
+*@PROJECT_NAME@* [*-h* | *--help*] [*--version*]
+
+== Description
+
+*@PROJECT_NAME@* sets the per-user VNC password authenticated by
+*pam_fnal_vncpasswd*(8).  It prompts for a new password twice on the
+controlling terminal, hashes it using the system's preferred *crypt*(3)
+algorithm (yescrypt on RHEL 9+ with libxcrypt >= 4.4), and writes the hash
+atomically to *~/@VNC_PASSWD_DIR@/@VNC_PASSWD_FILENAME@*.
+
+The tool acts on behalf of the calling process's real UID.  It does not
+require elevated privileges and must not be installed setuid.
+
+== Options
+
+*-h*, *--help*::
+  Print a short usage summary including the password file path and exit.
+
+*--version*::
+  Print the program name and version string and exit.
+
+== Password Requirements
+
+Passwords must be between *@VNC_MIN_PASSWORD_LENGTH@* and *8* characters.
+The upper bound is fixed by the RFB protocol and cannot be changed.
+The tool enforces both limits before hashing.  No other character-class
+policy is applied; the quality of the chosen password is the user's
+responsibility.
+
+The length upper bound also functions as a denial-of-service guard: the PAM
+module imposes no length check on authentication because a password too long
+to have been set by this tool will produce a mismatched hash and fail
+naturally.
+
+== Security
+
+=== Algorithm and Salt
+
+Salt generation uses *getrandom*(2) — the kernel CSPRNG — in a loop that
+tolerates short reads before the entropy pool is fully seeded.  The salt is
+passed to *crypt_gensalt_ra*(3) with a NULL prefix (compiled-in preferred
+algorithm) and count 0 (algorithm default cost).
+
+This may cause a hang on systems with an unseeded entropy pool.
+
+=== Atomic Write
+
+The password file is written as follows to prevent partial-write corruption:
+
+. *mkostemp*(3) creates a temporary file in the same directory as the
+  destination, with *O_CLOEXEC* set.
+. *fchmod*(2) sets permissions to *0600* before any data is written.
+. *write*(2) writes the hash followed by a newline.  An incomplete write is treated as *EIO*.
+. *fsync*(2) flushes the data to stable storage.
+. *rename*(2) atomically replaces the destination.
+. When built with SELinux support, *selinux_restorecon*(3) is called on the
+  destination path; failure is non-fatal.
+
+Atomic file writes are not guaranteed on network filesystems.
+
+=== Terminal I/O
+
+Passwords are read via *readpassphrase*(3bsd) with *RPP_ECHO_OFF* and
+*RPP_REQUIRE_TTY*.  The tool fails if no controlling terminal is available
+rather than reading silently from stdin.
+
+== Password File
+
+----
+~/@VNC_PASSWD_DIR@/@VNC_PASSWD_FILENAME@
+----
+
+A single line containing a *crypt*(3) hash.  The VNC configuration directory
+(*~/@VNC_PASSWD_DIR@*) is created with mode *0700* if it does not already
+exist.
+
+The PAM module (*pam_fnal_vncpasswd*(8)) validates that this file is owned
+by the user, is a regular file (not a symlink), and has no executable or
+group/world read-write bits set.  Files not satisfying those requirements
+will cause authentication to fail with *PAM_AUTHINFO_UNAVAIL*.
+
+== Exit Status
+
+*0*::
+  Password updated successfully.
+
+*1*::
+  An error occurred: password too short or long, passwords did not match,
+  hashing failed, or the password file could not be written.  A diagnostic
+  message is printed to standard error.
+
+== Files
+
+*~/@VNC_PASSWD_DIR@/@VNC_PASSWD_FILENAME@*::
+  Per-user VNC password file.
+
+*~/@VNC_PASSWD_DIR@/*::
+  VNC configuration directory, created mode *0700* if absent.
+
+== See Also
+
+*pam_fnal_vncpasswd*(8), *crypt*(3), *crypt_gensalt_ra*(3),
+*readpassphrase*(3bsd), *getrandom*(2), *explicit_bzero*(3)
+
+== Authors
+
+Fermi Forward Discovery Group
