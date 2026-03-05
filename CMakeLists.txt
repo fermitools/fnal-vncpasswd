@@ -17,6 +17,9 @@ endif()
 # CMake modules
 include(GNUInstallDirs)
 include(CheckCSourceCompiles)
+include(CheckCCompilerFlag)
+include(CheckIPOSupported)
+include(CheckPIESupported)
 
 # ##############################################################################
 # Enable testing target
