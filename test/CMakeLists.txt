@@ -122,7 +122,8 @@ target_include_directories(
                     "${PAM_INCLUDE_DIR}")
 target_link_libraries(test_auth PRIVATE PkgConfig::LIBXCRYPT "${PAM_LIBRARY}"
                                         crypto_dep)
-target_link_options(test_auth PRIVATE -Wl,--wrap=pam_syslog)
+target_compile_options(test_auth PRIVATE -fno-lto)
+target_link_options(test_auth PRIVATE -Wl,--wrap=pam_syslog -fno-lto)
 add_coverage_flags(test_auth)
 
 add_test(NAME test_auth COMMAND test_auth)

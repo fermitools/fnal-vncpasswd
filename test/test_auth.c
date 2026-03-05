@@ -76,7 +76,7 @@ int _mock_pam_syslog_calls = 0;
 int _mock_pam_syslog_last_pri = 0;
 
 void __wrap_pam_syslog(const pam_handle_t *pamh, int priority, const char *fmt,
-                       ...);
+                       ...) __attribute__((used, noinline));
 void __wrap_pam_syslog(const pam_handle_t *pamh, int priority, const char *fmt,
                        ...) {
   (void)pamh;
