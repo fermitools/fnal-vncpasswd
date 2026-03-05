@@ -1,3 +1,9 @@
+%if 0%{?rhel} < 10 &&  0%{?fedora} < 1
+%bcond_with pam
+%else
+%bcond_without pam
+%endif
+
 Name:           fnal-vncpasswd
 Version:        0.1.0
 Release:        1%{?dist}
@@ -11,7 +17,9 @@ Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
 BuildRequires:  redhat-rpm-config
 BuildRequires:  cmake >= 3.21
 BuildRequires:  gcc
+%if %{with pam}
 BuildRequires:  pam-devel
+%endif
 BuildRequires:  libxcrypt-devel
 BuildRequires:  openssl-devel
 BuildRequires:  libbsd-devel
@@ -25,6 +33,7 @@ fnal-vncpasswd lets users set a local VNC password stored under
 file is readable only by the owning user and is never passed over the
 network.
 
+%if %{with pam}
 %package -n pam_%{name}
 Summary:        PAM module for fnal-vncpasswd authentication
 Requires:       %{name} = %{version}-%{release}
@@ -34,6 +43,7 @@ PAM module that authenticates VNC sessions against the password file
 managed by fnal-vncpasswd.
 
 You must still configure PAM yourself.
+%endif
 
 
 %prep
@@ -51,6 +61,14 @@ You must still configure PAM yourself.
 %install
 %cmake_install
 
+%if %{without pam}
+rm -rf %{buildroot}%{_mandir}/man8/pam_fnal_vncpasswd.8*
+rm -rf %{buildroot}%{_libdir}/security/pam_fnal_vncpasswd.so
+rmdir %{buildroot}%{_mandir}/man8/ || true
+rmdir %{buildroot}%{_libdir}/security || true
+rmdir %{buildroot}%{_libdir} || true
+%endif
+
 
 %check
 %ctest --output-on-failure
@@ -62,10 +80,12 @@ You must still configure PAM yourself.
 %doc %{_mandir}/man1/fnal-vncpasswd.1*
 %{_bindir}/%{name}
 
+%if %{with pam}
 %files -n pam_%{name}
 %license LICENSE
 %doc %{_mandir}/man8/pam_fnal_vncpasswd.8*
 %{_libdir}/security/pam_fnal_vncpasswd.so
+%endif
 
 
 %changelog
