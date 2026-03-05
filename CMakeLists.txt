@@ -85,6 +85,86 @@ if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
   )
 endif()
 
+# Position Independent Code (PIE)
+check_pie_supported(OUTPUT_VARIABLE output LANGUAGES C)
+if(CMAKE_C_LINK_PIE_SUPPORTED)
+  set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+  message(STATUS "PIE support: enabled")
+else()
+  message(WARNING "PIE is not supported at link time: ${output}")
+  message(WARNING "PIE link options will not be passed to linker")
+endif()
+
+# Interprocedural Optimization (LTO)
+check_ipo_supported(RESULT IPO_RESULT)
+if(IPO_RESULT)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  message(STATUS "LTO/IPO support: enabled")
+else()
+  message(WARNING "Interprocedural Optimization is not supported: ${output}")
+  message(WARNING "LTO will not be enabled")
+endif()
+
+# ##############################################################################
+# Compiler Hardening Flags
+
+# Stack protector: ALL
+check_c_compiler_flag(-fstack-protector-all HAVE_SSP_ALL)
+if (HAVE_SSP_ALL)
+  add_compile_options(-fstack-protector-all)
+else()
+  message(FATAL_ERROR "Required flag -fstack-protector-all not supported")
+endif()
+
+# Stack clash protection
+CHECK_C_COMPILER_FLAG(-fstack-clash-protection STACK_CLASH)
+if (STACK_CLASH)
+  add_compile_options(-fstack-clash-protection)
+  message(STATUS "Stack clash protection: enabled")
+else ()
+  message(WARNING "Stack clash protection not supported by compiler")
+endif()
+
+# Disable stack slot reuse
+CHECK_C_COMPILER_FLAG(-fstack-reuse=none STACK_REUSE)
+if (STACK_REUSE)
+  add_compile_options(-fstack-reuse=none)
+else ()
+  message(FATAL_ERROR "Required compiler flag '-fstack-reuse=none' not supported")
+endif()
+
+# Zero call-used registers on return
+check_c_compiler_flag(-fzero-call-used-regs=all HAVE_ZERO_CALL_REGS)
+if (HAVE_ZERO_CALL_REGS)
+  add_compile_options(-fzero-call-used-regs=all)
+endif()
+
+# Control-flow enforcement
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+  # x86_64
+  check_c_compiler_flag(-fcf-protection=full HAVE_CET)
+  if (HAVE_CET)
+    add_compile_options(-fcf-protection=full)
+  else()
+    message(FATAL_ERROR "Intel CET (-fcf-protection=full) required on x86_64")
+  endif()
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+  # ARM
+  check_c_compiler_flag(-mbranch-protection=standard HAVE_BTI)
+  if (HAVE_BTI)
+    add_compile_options(-mbranch-protection=standard)
+  else()
+    message(FATAL_ERROR "Branch Protection (-mbranch-protection=standard) required on aarch64")
+  endif()
+endif()
+
+# Linker Hardening Flags
+add_link_options(
+  -Wl,-z,noexecstack # Mark stack as non-executable
+  -Wl,-z,ibt # Fail at runtime if ibt fails
+  -Wl,-z,shstk # Fail at runtime if no shadow stack
+)
+
 # ##############################################################################
 # Find our source code version string
 if(NOT DEFINED VERSION OR VERSION STREQUAL "")
