@@ -42,7 +42,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
       - name: Build
-        run: cmake --build build --parallel
+        run: |
+          export LDFLAGS="-Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,combreloc"
+          cmake --build build --parallel --verbose
 
       - name: Test
         run: |
