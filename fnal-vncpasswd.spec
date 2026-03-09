@@ -16,15 +16,17 @@ Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
 
 BuildRequires:  redhat-rpm-config
 BuildRequires:  cmake >= 3.21
-BuildRequires:  gcc
-%if %{with pam}
-BuildRequires:  pam-devel
-%endif
-BuildRequires:  libxcrypt-devel
 BuildRequires:  openssl-devel
 BuildRequires:  libbsd-devel
 BuildRequires:  libselinux-devel
+BuildRequires:  libxcrypt-devel
 BuildRequires:  (rubygem-asciidoctor or asciidoc)
+
+%if %{with pam}
+BuildRequires:  pam-devel
+%endif
+
+Provides:	fermilab-util_fnal-vncpasswd = %{version}-%{release}
 
 Summary:        Per-user VNC password manager and PAM authentication module
 %description
