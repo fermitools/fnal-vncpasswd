@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.21)
 
 project(fnal-vncpasswd C)
 
+option(BUILD_PAM_MODULE "Build the PAM authentication module" ON)
+
 # ##############################################################################
 # Require out-of-source builds
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
@@ -195,17 +197,19 @@ endif()
 # ##############################################################################
 # Top Level System Variables, these are pretty much a public api
 
-set(_default_pam_dir "${CMAKE_INSTALL_FULL_LIBDIR}/security")
+if(BUILD_PAM_MODULE)
+  set(_default_pam_dir "${CMAKE_INSTALL_FULL_LIBDIR}/security")
 
-if(NOT DEFINED PAM_MODULE_DIR)
-  set(PAM_MODULE_DIR
-      "${_default_pam_dir}"
-      CACHE PATH "Directory where the PAM module is installed")
-elseif(NOT PAM_MODULE_DIR STREQUAL _default_pam_dir)
-  message(
-    WARNING
-      "PAM_MODULE_DIR (${PAM_MODULE_DIR}) differs from the platform default (${_default_pam_dir})"
-  )
+  if(NOT DEFINED PAM_MODULE_DIR)
+    set(PAM_MODULE_DIR
+        "${_default_pam_dir}"
+        CACHE PATH "Directory where the PAM module is installed")
+  elseif(NOT PAM_MODULE_DIR STREQUAL _default_pam_dir)
+    message(
+      WARNING
+        "PAM_MODULE_DIR (${PAM_MODULE_DIR}) differs from the platform default (${_default_pam_dir})"
+    )
+  endif()
 endif()
 
 if(NOT DEFINED VNC_PASSWD_DIR)
@@ -248,11 +252,11 @@ add_subdirectory(test)
 # ##############################################################################
 # Print out state summary
 message(STATUS "${CMAKE_PROJECT_NAME} - ${VERSION}")
-message(STATUS "  BUILD_PAM_MODULE          = ${BUILD_PAM_MODULE}")
+message(STATUS "  BUILD_PAM_MODULE        = ${BUILD_PAM_MODULE}")
 if(BUILD_PAM_MODULE)
-  message(STATUS "  PAM_MODULE_DIR            = ${PAM_MODULE_DIR}")
+  message(STATUS "  PAM_MODULE_DIR          = ${PAM_MODULE_DIR}")
 endif()
-message(STATUS "  VNC_PASSWD_DIR            = ~/${VNC_PASSWD_DIR}")
-message(STATUS "  VNC_PASSWD_FILENAME       = ${VNC_PASSWD_FILENAME}")
-message(STATUS "  VNC_MAX_PASSWORD_LENGTH   = ${VNC_MAX_PASSWORD_LENGTH}")
-message(STATUS "  VNC_MIN_PASSWORD_LENGTH   = ${VNC_MIN_PASSWORD_LENGTH}")
+message(STATUS "  VNC_PASSWD_DIR          = ~/${VNC_PASSWD_DIR}")
+message(STATUS "  VNC_PASSWD_FILENAME     = ${VNC_PASSWD_FILENAME}")
+message(STATUS "  VNC_MAX_PASSWORD_LENGTH = ${VNC_MAX_PASSWORD_LENGTH}")
+message(STATUS "  VNC_MIN_PASSWORD_LENGTH = ${VNC_MIN_PASSWORD_LENGTH}")

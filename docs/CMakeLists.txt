@@ -66,7 +66,8 @@ install(FILES ${PROJECT_BINARY_DIR}/fnal-vncpasswd.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 if(BUILD_PAM_MODULE)
-  add_custom_target(doc ALL DEPENDS ${PROJECT_BINARY_DIR}/pam_fnal_vncpasswd.8)
+  add_custom_target(pam_doc DEPENDS ${PROJECT_BINARY_DIR}/pam_fnal_vncpasswd.8)
+  add_dependencies(doc pam_doc)
   install(FILES ${PROJECT_BINARY_DIR}/pam_fnal_vncpasswd.8
           DESTINATION ${CMAKE_INSTALL_MANDIR}/man8)
 endif()
