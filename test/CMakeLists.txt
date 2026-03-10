@@ -113,20 +113,21 @@ add_test(NAME test_passwd COMMAND test_passwd)
 # define __wrap_pam_syslog and record calls. This lets debug=true paths be
 # verified without depending on syslog infrastructure, while still linking the
 # real libpam for pam_handle_t and PAM_* constants.
+if(BUILD_PAM_MODULE)
+  add_executable(test_auth test_auth.c "${CMAKE_SOURCE_DIR}/src/pam/auth.c"
+                           ${VNC_COMMON_SRCS})
 
-add_executable(test_auth test_auth.c "${CMAKE_SOURCE_DIR}/src/pam/auth.c"
-                         ${VNC_COMMON_SRCS})
+  target_include_directories(
+    test_auth PRIVATE ${TEST_INCLUDES} "${CMAKE_SOURCE_DIR}/src/pam"
+                      "${PAM_INCLUDE_DIR}")
+  target_link_libraries(test_auth PRIVATE PkgConfig::LIBXCRYPT "${PAM_LIBRARY}"
+                                          crypto_dep)
+  target_compile_options(test_auth PRIVATE -fno-lto)
+  target_link_options(test_auth PRIVATE -Wl,--wrap=pam_syslog -fno-lto)
+  add_coverage_flags(test_auth)
 
-target_include_directories(
-  test_auth PRIVATE ${TEST_INCLUDES} "${CMAKE_SOURCE_DIR}/src/pam"
-                    "${PAM_INCLUDE_DIR}")
-target_link_libraries(test_auth PRIVATE PkgConfig::LIBXCRYPT "${PAM_LIBRARY}"
-                                        crypto_dep)
-target_compile_options(test_auth PRIVATE -fno-lto)
-target_link_options(test_auth PRIVATE -Wl,--wrap=pam_syslog -fno-lto)
-add_coverage_flags(test_auth)
-
-add_test(NAME test_auth COMMAND test_auth)
+  add_test(NAME test_auth COMMAND test_auth)
+endif()
 
 # ============================================================================
 # Coverage report targets
