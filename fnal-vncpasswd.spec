@@ -22,9 +22,8 @@ BuildRequires:  libselinux-devel
 BuildRequires:  libxcrypt-devel
 BuildRequires:  (rubygem-asciidoctor or asciidoc)
 
-%if %{with pam}
+# PAM is included unconditionally
 BuildRequires:  pam-devel
-%endif
 
 %if 0%{?rhel} < 10
 BuildRequires:	gcc-toolset-14 scl-utils
