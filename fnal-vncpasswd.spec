@@ -1,4 +1,4 @@
-%if 0%{?rhel} < 10 &&  0%{?fedora} < 1
+%if 0%{?rhel} < 10 && 0%{?fedora} < 1
 %bcond_with pam
 %else
 %bcond_without pam
@@ -24,6 +24,10 @@ BuildRequires:  (rubygem-asciidoctor or asciidoc)
 
 %if %{with pam}
 BuildRequires:  pam-devel
+%endif
+
+%if 0%{?rhel} < 10
+BuildRequires:	gcc-toolset-14 scl-utils
 %endif
 
 Provides:	fermilab-util_fnal-vncpasswd = %{version}-%{release}
@@ -53,28 +57,47 @@ You must still configure PAM yourself.
 
 
 %build
+%if 0%{?rhel} < 10 && 0%{?fedora} < 31
+source scl_source enable gcc-toolset-14
+%endif
+
+%if 0%{?rhel} < 9 && 0%{?fedora} < 31
+mkdir build
+cd build
+%cmake3 \
+    -DVERSION=%{version}  \
+%if %{without pam}
+    -BUILD_PAM_MODULE=OFF \
+%endif
+    -DBUILD_TESTING=ON    \
+    -Wdeprecated ..
+make VERBOSE=2 %{?_smp_mflags}
+%else
 %cmake \
-    -Wdev -Wdeprecated --warn-uninitialized \
-    -DVERSION=%{version}                    \
+    -DVERSION=%{version}  \
+%if %{without pam}
+    -BUILD_PAM_MODULE=OFF \
+%endif
     -DBUILD_TESTING=ON
 %cmake_build
-
-
-%install
-%cmake_install
-
-%if %{without pam}
-rm -rf %{buildroot}%{_mandir}/man8/pam_fnal_vncpasswd.8*
-rm -rf %{buildroot}%{_libdir}/security/pam_fnal_vncpasswd.so
-rmdir %{buildroot}%{_mandir}/man8/ || true
-rmdir %{buildroot}%{_libdir}/security || true
-rmdir %{buildroot}%{_libdir} || true
 %endif
 
 
-%check
-%ctest --output-on-failure
+%install
+%if 0%{?rhel} < 9 && 0%{?fedora} < 31
+cd build
+make install DESTDIR=%{buildroot}
+%else
+%cmake_install
+%endif
 
+%check
+%if 0%{?rhel} < 9 && 0%{?fedora} < 31
+cd build
+make test
+%else
+%ctest --output-on-failure
+%endif
 
 %files
 %license LICENSE

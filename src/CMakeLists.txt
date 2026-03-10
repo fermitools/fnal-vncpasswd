@@ -5,6 +5,8 @@
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/autoconf.h.in"
                "${CMAKE_CURRENT_BINARY_DIR}/autoconf.h" @ONLY)
 
+option(BUILD_PAM_MODULE "Build the PAM authentication module" ON)
+
 # ##############################################################################
 # Shared dependencies
 # ##############################################################################
@@ -59,5 +61,7 @@ set_target_properties(vnc_shared PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # Subdirectories
 # ##############################################################################
 
-add_subdirectory(pam)
 add_subdirectory(fnal-vncpasswd)
+if(BUILD_PAM_MODULE)
+  add_subdirectory(pam)
+endif()

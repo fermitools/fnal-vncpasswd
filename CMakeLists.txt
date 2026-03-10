@@ -248,8 +248,10 @@ add_subdirectory(test)
 # ##############################################################################
 # Print out state summary
 message(STATUS "${CMAKE_PROJECT_NAME} - ${VERSION}")
-message(STATUS "Compile Time Configuration:")
-message(STATUS "  PAM_MODULE_DIR            = ${PAM_MODULE_DIR}")
+message(STATUS "  BUILD_PAM_MODULE          = ${BUILD_PAM_MODULE}")
+if(BUILD_PAM_MODULE)
+  message(STATUS "  PAM_MODULE_DIR            = ${PAM_MODULE_DIR}")
+endif()
 message(STATUS "  VNC_PASSWD_DIR            = ~/${VNC_PASSWD_DIR}")
 message(STATUS "  VNC_PASSWD_FILENAME       = ${VNC_PASSWD_FILENAME}")
 message(STATUS "  VNC_MAX_PASSWORD_LENGTH   = ${VNC_MAX_PASSWORD_LENGTH}")
