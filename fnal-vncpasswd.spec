@@ -67,7 +67,7 @@ cd build
 %cmake3 \
     -DVERSION=%{version}  \
 %if %{without pam}
-    -BUILD_PAM_MODULE=OFF \
+    -DBUILD_PAM_MODULE:BOOL=OFF \
 %endif
     -DBUILD_TESTING=ON    \
     -Wdeprecated ..
@@ -76,7 +76,7 @@ make VERBOSE=2 %{?_smp_mflags}
 %cmake \
     -DVERSION=%{version}  \
 %if %{without pam}
-    -BUILD_PAM_MODULE=OFF \
+    -DBUILD_PAM_MODULE:BOOL=OFF \
 %endif
     -DBUILD_TESTING=ON
 %cmake_build
