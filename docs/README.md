@@ -12,7 +12,7 @@ in multi-user services (sshd, login, sudo) where the process runs as root.
 ## Requirements
 
 - CMake >= 3.21, pkg-config
-- C23 compiler (GCC or Clang)
+- C17 compiler (GCC or Clang)
 - libxcrypt, PAM, libbsd
 - OpenSSL, LibreSSL, or GnuTLS
 - Optional: libselinux
