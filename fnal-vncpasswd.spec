@@ -53,19 +53,27 @@ You must still configure PAM yourself.
 
 
 %build
+%if 0%{?rhel} < 9 &&  0%{?fedora} < 31
+mkdir build
+cd build
+%endif
+
 %cmake \
-    -Wdev -Wdeprecated --warn-uninitialized \
     -DVERSION=%{version}                    \
     -DBUILD_TESTING=ON
 %cmake_build
 
 
 %install
+%if 0%{?rhel} < 9 &&  0%{?fedora} < 31
+cd build
+%endif
+
 %cmake_install
 
 %if %{without pam}
-rm -rf %{buildroot}%{_mandir}/man8/pam_fnal_vncpasswd.8*
-rm -rf %{buildroot}%{_libdir}/security/pam_fnal_vncpasswd.so
+rm -rf %{buildroot}%{_mandir}/man8/pam_fnal_vncpasswd.*
+rm -rf %{buildroot}%{_libdir}/security/pam_fnal_vncpasswd.*
 rmdir %{buildroot}%{_mandir}/man8/ || true
 rmdir %{buildroot}%{_libdir}/security || true
 rmdir %{buildroot}%{_libdir} || true
@@ -73,6 +81,10 @@ rmdir %{buildroot}%{_libdir} || true
 
 
 %check
+%if 0%{?rhel} < 9 &&  0%{?fedora} < 31
+cd build
+%endif
+
 %ctest --output-on-failure
 
 
