@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <pwd.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,6 +80,7 @@ static const char * const salt_prefixes[] = {
     "$5$",  /* sha256crypt */
 };
 #define SALT_PREFIXES_COUNT (sizeof(salt_prefixes) / sizeof(salt_prefixes[0]))
+_Static_assert(SALT_PREFIXES_COUNT > 0, "salt_prefixes must not be empty");
 
 /* Password file path resolution */
 
@@ -170,7 +172,7 @@ int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf,
  * Returns a string literal prefix, never NULL.
  */
 static const char *select_prefix(const struct syscall_ops *ops) {
-  for (long unsigned int i = 0; i < SALT_PREFIXES_COUNT; i++) {
+  for (size_t i = 0; i < SALT_PREFIXES_COUNT; i++) {
     char *probe = ops->crypt_gensalt_ra(salt_prefixes[i], 0, NULL, 0);
     if (probe == NULL) {
       continue;
