@@ -4,7 +4,8 @@
  * Authenticates against a per-user VNC password file using crypt(3).
  *
  * Security model:
- *   - O_NOFOLLOW + O_NONBLOCK + fstat() for TOCTOU-safe file access.
+ *   - O_NONBLOCK + fstat() for fairly-safe file access.
+ *   - Symbolic links are permitted in the by popular demand.
  *   - Constant-time comparison to prevent timing attacks.
  *   - explicit_bzero() on all sensitive buffers.
  *   - Session binding: the supplied username must resolve to getuid() to
@@ -100,13 +101,12 @@ static int validate_passwd_file(const struct syscall_ops *ops, const char *path,
   int fd = -1;
 
   /*
-   * O_NOFOLLOW: refuse to open symlinks (prevents symlink-swap TOCTOU attack).
    * O_NONBLOCK: prevents blocking on a FIFO at the target path. Opening a FIFO
    * for reading without O_NONBLOCK blocks until a writer appears, which is a
    * denial-of-service vector. The S_ISREG check below rejects FIFOs
    * regardless, but we must not block before reaching it.
    */
-  fd = ops->open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+  fd = ops->open(path, O_RDONLY | O_NONBLOCK);
   if (fd < 0) {
     return -1;
   }

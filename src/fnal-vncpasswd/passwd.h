@@ -77,7 +77,7 @@ int hash_password(const struct syscall_ops *ops, const char *password,
  *   - Any component exists but is not a directory → ENOTDIR.
  *   - @path contains ".." as a path component → EINVAL.
  *     (realpath(3) is not used because the path may not exist yet.)
- *   - Any lstat(2) or mkdir(2) fails for another reason → that errno.
+ *   - Any stat(2) or mkdir(2) fails for another reason -> that errno.
  *
  * TOCTOU: on EEXIST from mkdir(2), the function re-stats to confirm the
  * racing creator also made a directory rather than a symlink or regular file.

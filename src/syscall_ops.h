@@ -44,7 +44,7 @@ struct syscall_ops {
   int (*open)(const char *pathname, int flags, ...);
   int (*close)(int fd);
   int (*fstat)(int fd, struct stat *statbuf);
-  int (*lstat)(const char *pathname, struct stat *statbuf);
+  int (*stat)(const char *pathname, struct stat *statbuf);
   FILE *(*fdopen)(int fd, const char *mode);
   int (*fclose)(FILE *stream);
   char *(*fgets)(char *str, int n, FILE *stream);

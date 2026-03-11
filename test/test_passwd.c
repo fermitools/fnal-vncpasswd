@@ -211,7 +211,12 @@ static char *mock_crypt_r(const char *phrase, const char *setting,
   return data->output;
 }
 
-/* --- lstat -----------------------------------------------------------------
+/* --- stat ------------------------------------------------------------------
+ *
+ * Mocks ops->stat, which follows symlinks. make_one_dir() uses stat(2) so
+ * that symlinks pointing to directories are accepted: stat resolves the link
+ * and returns S_IFDIR for the target. Only non-symlink, non-directory entries
+ * (regular files, sockets, …) are rejected with ENOTDIR.
  */
 
 static struct {
@@ -220,17 +225,17 @@ static struct {
   int errno_on_second;   /* errno set on call 2 */
   mode_t st_mode_first;  /* st_mode on successful first call */
   mode_t st_mode_second; /* st_mode on successful second call */
-} _cfg_lstat;
+} _cfg_stat;
 
-static int mock_lstat(const char *path, struct stat *st) {
+static int mock_stat(const char *path, struct stat *st) {
   int call;
   int err;
 
   (void)path;
-  _cfg_lstat.call_count++;
+  _cfg_stat.call_count++;
 
-  call = _cfg_lstat.call_count;
-  err = (call == 1) ? _cfg_lstat.errno_on_first : _cfg_lstat.errno_on_second;
+  call = _cfg_stat.call_count;
+  err = (call == 1) ? _cfg_stat.errno_on_first : _cfg_stat.errno_on_second;
 
   if (err != 0) {
     errno = err;
@@ -239,7 +244,7 @@ static int mock_lstat(const char *path, struct stat *st) {
 
   memset(st, 0, sizeof(*st));
   st->st_mode =
-      (call == 1) ? _cfg_lstat.st_mode_first : _cfg_lstat.st_mode_second;
+      (call == 1) ? _cfg_stat.st_mode_first : _cfg_stat.st_mode_second;
   return 0;
 }
 
@@ -466,17 +471,20 @@ static struct syscall_ops make_happy_atomic_ops(void) {
 /**
  * make_dir_ops - Creates syscall_ops wired for ensure_vnc_dir tests.
  *
- * Wires lstat and mkdir mocks and resets their config to zero. Callers set
+ * Wires stat and mkdir mocks and resets their config to zero. Callers set
  * errno_on_first, st_mode_first, fail_errno, etc. to control behaviour.
+ *
+ * stat (not lstat) is mocked because make_one_dir() calls ops->stat so that
+ * symlinks pointing to directories are followed and accepted.
  *
  * Returns: Initialized syscall_ops structure.
  */
 static struct syscall_ops make_dir_ops(void) {
   struct syscall_ops ops = syscall_ops_default;
-  ops.lstat = mock_lstat;
+  ops.stat = mock_stat;
   ops.mkdir = mock_mkdir;
 
-  memset(&_cfg_lstat, 0, sizeof(_cfg_lstat));
+  memset(&_cfg_stat, 0, sizeof(_cfg_stat));
   memset(&_cfg_mkdir, 0, sizeof(_cfg_mkdir));
   return ops;
 }
@@ -484,7 +492,7 @@ static struct syscall_ops make_dir_ops(void) {
 /**
  * make_passwd_path_ops - Creates syscall_ops wired for get_passwd_path tests.
  *
- * Default state: lstat reports every component as an existing directory;
+ * Default state: stat reports every component as an existing directory;
  * getpwuid_r resolves uid 1000 with home /home/user.
  *
  * Returns: Initialized syscall_ops structure.
@@ -493,19 +501,19 @@ static struct syscall_ops make_passwd_path_ops(void) {
   struct syscall_ops ops = syscall_ops_default;
   ops.calloc = mock_calloc;
   ops.getpwuid_r = mock_getpwuid_r;
-  ops.lstat = mock_lstat;
+  ops.stat = mock_stat;
   ops.mkdir = mock_mkdir;
 
   memset(&_cfg_calloc, 0, sizeof(_cfg_calloc));
   memset(&_cfg_getpwuid_r, 0, sizeof(_cfg_getpwuid_r));
-  memset(&_cfg_lstat, 0, sizeof(_cfg_lstat));
+  memset(&_cfg_stat, 0, sizeof(_cfg_stat));
   memset(&_cfg_mkdir, 0, sizeof(_cfg_mkdir));
 
-  /* Default: lstat says dir already exists. */
-  _cfg_lstat.errno_on_first = 0;
-  _cfg_lstat.st_mode_first = S_IFDIR | 0700;
-  _cfg_lstat.errno_on_second = 0;
-  _cfg_lstat.st_mode_second = S_IFDIR | 0700;
+  /* Default: stat says dir already exists. */
+  _cfg_stat.errno_on_first = 0;
+  _cfg_stat.st_mode_first = S_IFDIR | 0700;
+  _cfg_stat.errno_on_second = 0;
+  _cfg_stat.st_mode_second = S_IFDIR | 0700;
 
   /* Default pw entry: uid 1000, home /home/user. */
   _cfg_getpwuid_r.rc = 0;
@@ -830,14 +838,14 @@ TEST(ensure_vnc_dir_dotdot_exactly_three) {
  * so the RHS of the || is never evaluated. The condition is false; the path
  * passes the dotdot check and reaches snprintf. snprintf copies "/a" into tmp
  * without truncation; the loop body is never entered (no '/' after tmp+1);
- * make_one_dir is called for "/a". With lstat returning ENOENT and mkdir
+ * make_one_dir is called for "/a". With stat returning ENOENT and mkdir
  * succeeding the function returns 0.
  */
 TEST(ensure_vnc_dir_dotdot_short_path) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  _cfg_lstat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_first = ENOENT;
   _cfg_mkdir.fail_errno = 0;
   rc = ensure_vnc_dir(&ops, "/a");
   TEST_ASSERT_EQ(rc, 0, "two-char path must not trigger dotdot check");
@@ -857,8 +865,8 @@ TEST(ensure_vnc_dir_dotdot_in_component_name) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  _cfg_lstat.errno_on_first = ENOENT;
-  _cfg_lstat.errno_on_second = ENOENT;
+  _cfg_stat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_second = ENOENT;
   _cfg_mkdir.fail_errno = 0;
   rc = ensure_vnc_dir(&ops, "/home/..config");
   TEST_ASSERT_EQ(rc, 0, "dotdot embedded in name must not be rejected");
@@ -873,11 +881,11 @@ TEST(ensure_vnc_dir_already_exists) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  /* lstat says every component exists as a directory. */
-  _cfg_lstat.errno_on_first = 0;
-  _cfg_lstat.st_mode_first = S_IFDIR | 0700;
-  _cfg_lstat.errno_on_second = 0;
-  _cfg_lstat.st_mode_second = S_IFDIR | 0700;
+  /* stat says every component exists as a directory. */
+  _cfg_stat.errno_on_first = 0;
+  _cfg_stat.st_mode_first = S_IFDIR | 0700;
+  _cfg_stat.errno_on_second = 0;
+  _cfg_stat.st_mode_second = S_IFDIR | 0700;
   rc = ensure_vnc_dir(&ops, "/a/b");
   TEST_ASSERT_EQ(rc, 0, "pre-existing dir must return 0");
 }
@@ -886,9 +894,9 @@ TEST(ensure_vnc_dir_creates_missing) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  /* lstat: ENOENT for every component; mkdir succeeds. */
-  _cfg_lstat.errno_on_first = ENOENT;
-  _cfg_lstat.errno_on_second = ENOENT;
+  /* stat: ENOENT for every component; mkdir succeeds. */
+  _cfg_stat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_second = ENOENT;
   _cfg_mkdir.fail_errno = 0;
   rc = ensure_vnc_dir(&ops, "/a/b");
   TEST_ASSERT_EQ(rc, 0, "missing dir must be created and return 0");
@@ -898,27 +906,84 @@ TEST(ensure_vnc_dir_exists_as_nondir) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  /* lstat says the first component is a regular file. */
-  _cfg_lstat.errno_on_first = 0;
-  _cfg_lstat.st_mode_first = S_IFREG | 0644;
+  /*
+   * stat returns S_IFREG: a regular file blocks the path. Symlinks are
+   * accepted (stat follows them); only non-symlink, non-directory entries
+   * must be rejected with ENOTDIR.
+   */
+  _cfg_stat.errno_on_first = 0;
+  _cfg_stat.st_mode_first = S_IFREG | 0644;
   rc = ensure_vnc_dir(&ops, "/a/b");
   TEST_ASSERT_EQ(rc, -1, "file where dir expected must return -1");
   TEST_ASSERT_EQ(errno, ENOTDIR, "file where dir expected must set ENOTDIR");
 }
 
 /*
+ * ensure_vnc_dir_exists_as_symlink - stat returns S_IFLNK at an existing path.
+ *
+ * make_one_dir() calls stat(2), which follows symlinks; it only returns
+ * S_IFLNK for dangling symlinks. Symlinks must be accepted regardless —
+ * returning ENOTDIR here would break the common case of ~/.config/vnc being a
+ * managed symlink. The test also guards against any future explicit S_IFLNK
+ * rejection being added to make_one_dir().
+ */
+/*
+ * ensure_vnc_dir_exists_as_symlink - stat returns S_IFLNK at an existing path.
+ *
+ * make_one_dir() calls stat(2), which follows symlinks; it only returns
+ * S_IFLNK for dangling symlinks. Symlinks must be accepted regardless —
+ * returning ENOTDIR here would break the common case of ~/.config/vnc being a
+ * managed symlink. The test also guards against any future explicit S_IFLNK
+ * rejection being added to make_one_dir().
+ *
+ * Path "/a/b" has two components so mock_stat is called twice: once for the
+ * intermediate "/a" and once for the final "/a/b". Both calls must return
+ * S_IFLNK so neither component triggers ENOTDIR.
+ */
+TEST(ensure_vnc_dir_exists_as_symlink) {
+  struct syscall_ops ops = make_dir_ops();
+  int rc;
+
+  _cfg_stat.errno_on_first = 0;
+  _cfg_stat.st_mode_first = S_IFLNK | 0777;
+  _cfg_stat.errno_on_second = 0;
+  _cfg_stat.st_mode_second = S_IFLNK | 0777;
+  rc = ensure_vnc_dir(&ops, "/a/b");
+  TEST_ASSERT_EQ(rc, 0, "symlink must be accepted, not rejected with ENOTDIR");
+}
+
+/*
+ * ensure_vnc_dir_mkdir_eexist_then_symlink - TOCTOU race resolves to a symlink.
+ *
+ * stat -> ENOENT, mkdir -> EEXIST (racing creator), re-stat returns S_IFLNK.
+ * make_one_dir must accept the symlink on the re-stat path for the same
+ * reasons as ensure_vnc_dir_exists_as_symlink.
+ */
+TEST(ensure_vnc_dir_mkdir_eexist_then_symlink) {
+  struct syscall_ops ops = make_dir_ops();
+  int rc;
+
+  _cfg_stat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_second = 0;
+  _cfg_stat.st_mode_second = S_IFLNK | 0777;
+  _cfg_mkdir.fail_errno = EEXIST;
+  rc = ensure_vnc_dir(&ops, "/a/b");
+  TEST_ASSERT_EQ(rc, 0, "EEXIST race resolved to symlink must return 0");
+}
+
+/*
  * ensure_vnc_dir_mkdir_eexist_then_dir - Simulate the TOCTOU path.
  *
- * lstat says ENOENT, mkdir returns EEXIST (racing creator), re-lstat
+ * stat says ENOENT, mkdir returns EEXIST (racing creator), re-stat
  * confirms it is a directory.
  */
 TEST(ensure_vnc_dir_mkdir_eexist_then_dir) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  _cfg_lstat.errno_on_first = ENOENT; /* initial lstat: not found */
-  _cfg_lstat.errno_on_second = 0;     /* re-stat after EEXIST: found */
-  _cfg_lstat.st_mode_second = S_IFDIR | 0700;
+  _cfg_stat.errno_on_first = ENOENT; /* initial stat: not found */
+  _cfg_stat.errno_on_second = 0;     /* re-stat after EEXIST: found */
+  _cfg_stat.st_mode_second = S_IFDIR | 0700;
   _cfg_mkdir.fail_errno = EEXIST;
   rc = ensure_vnc_dir(&ops, "/a/b");
   TEST_ASSERT_EQ(rc, 0, "EEXIST race resolved to dir must return 0");
@@ -929,9 +994,9 @@ TEST(ensure_vnc_dir_mkdir_eexist_then_nondir) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  _cfg_lstat.errno_on_first = ENOENT;
-  _cfg_lstat.errno_on_second = 0;
-  _cfg_lstat.st_mode_second = S_IFREG | 0600;
+  _cfg_stat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_second = 0;
+  _cfg_stat.st_mode_second = S_IFREG | 0600;
   _cfg_mkdir.fail_errno = EEXIST;
   rc = ensure_vnc_dir(&ops, "/a/b");
   TEST_ASSERT_EQ(rc, -1, "EEXIST race resolved to file must return -1");
@@ -947,7 +1012,7 @@ TEST(ensure_vnc_dir_mkdir_fails_not_eexist) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  _cfg_lstat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_first = ENOENT;
   _cfg_mkdir.fail_errno = EACCES;
   rc = ensure_vnc_dir(&ops, "/a/b");
   TEST_ASSERT_EQ(rc, -1, "non-EEXIST mkdir failure must return -1");
@@ -970,7 +1035,7 @@ TEST(ensure_vnc_dir_mkdir_fails_emits_diagnostic) {
   char buf[256];
   ssize_t n;
 
-  _cfg_lstat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_first = ENOENT;
   _cfg_mkdir.fail_errno = EACCES;
 
   TEST_ASSERT_EQ(pipe(pipefd), 0, "pipe() must succeed");
@@ -994,37 +1059,37 @@ TEST(ensure_vnc_dir_mkdir_fails_emits_diagnostic) {
 }
 
 /*
- * ensure_vnc_dir_lstat_fails_not_enoent - Exercise make_one_dir lines 283-284.
+ * ensure_vnc_dir_stat_fails_not_enoent - Exercise make_one_dir lines 283-284.
  *
- * When the initial lstat() returns an error other than ENOENT, make_one_dir()
+ * When the initial stat() returns an error other than ENOENT, make_one_dir()
  * must propagate that error immediately without calling mkdir().
  */
-TEST(ensure_vnc_dir_lstat_fails_not_enoent) {
+TEST(ensure_vnc_dir_stat_fails_not_enoent) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  _cfg_lstat.errno_on_first = EACCES;
+  _cfg_stat.errno_on_first = EACCES;
   rc = ensure_vnc_dir(&ops, "/a/b");
-  TEST_ASSERT_EQ(rc, -1, "lstat EACCES must return -1");
-  TEST_ASSERT_EQ(errno, EACCES, "lstat EACCES errno must be preserved");
+  TEST_ASSERT_EQ(rc, -1, "stat EACCES must return -1");
+  TEST_ASSERT_EQ(errno, EACCES, "stat EACCES errno must be preserved");
 }
 
 /*
- * ensure_vnc_dir_mkdir_eexist_relstat_fails - Race path.
+ * ensure_vnc_dir_mkdir_eexist_restat_fails - Race path.
  *
- * lstat -> ENOENT, mkdir -> EEXIST, re-lstat -> EACCES.
- * make_one_dir must propagate the re-lstat failure.
+ * stat -> ENOENT, mkdir -> EEXIST, re-stat -> EACCES.
+ * make_one_dir must propagate the re-stat failure.
  */
-TEST(ensure_vnc_dir_mkdir_eexist_relstat_fails) {
+TEST(ensure_vnc_dir_mkdir_eexist_restat_fails) {
   struct syscall_ops ops = make_dir_ops();
   int rc;
 
-  _cfg_lstat.errno_on_first = ENOENT;
-  _cfg_lstat.errno_on_second = EACCES;
+  _cfg_stat.errno_on_first = ENOENT;
+  _cfg_stat.errno_on_second = EACCES;
   _cfg_mkdir.fail_errno = EEXIST;
   rc = ensure_vnc_dir(&ops, "/a/b");
-  TEST_ASSERT_EQ(rc, -1, "re-lstat failure after EEXIST must return -1");
-  TEST_ASSERT_EQ(errno, EACCES, "re-lstat errno must be preserved");
+  TEST_ASSERT_EQ(rc, -1, "re-stat failure after EEXIST must return -1");
+  TEST_ASSERT_EQ(errno, EACCES, "re-stat errno must be preserved");
 }
 
 /* ============================================================================
@@ -1336,7 +1401,7 @@ TEST(get_passwd_path_getpwuid_r_no_result) {
  * get_passwd_path_ensure_dir_fails - Verify ensure_vnc_dir failure propagation
  * through get_passwd_path.
  *
- * getpwuid_r succeeds; lstat on the first path component returns EACCES so
+ * getpwuid_r succeeds; stat on the first path component returns EACCES so
  * ensure_vnc_dir -> make_one_dir propagates the error back to get_passwd_path.
  */
 TEST(get_passwd_path_ensure_dir_fails) {
@@ -1344,7 +1409,7 @@ TEST(get_passwd_path_ensure_dir_fails) {
   char buf[PATH_MAX];
   int rc;
 
-  _cfg_lstat.errno_on_first = EACCES;
+  _cfg_stat.errno_on_first = EACCES;
   rc = get_passwd_path(&ops, 1000, buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, -1, "ensure_dir EACCES must propagate as -1");
   TEST_ASSERT_EQ(errno, EACCES, "errno must be EACCES");
@@ -1417,14 +1482,16 @@ int main(int argc, char **argv) {
   RUN_TEST(ensure_vnc_dir_already_exists);
   RUN_TEST(ensure_vnc_dir_creates_missing);
   RUN_TEST(ensure_vnc_dir_exists_as_nondir);
+  RUN_TEST(ensure_vnc_dir_exists_as_symlink);
   RUN_TEST(ensure_vnc_dir_mkdir_eexist_then_dir);
+  RUN_TEST(ensure_vnc_dir_mkdir_eexist_then_symlink);
   RUN_TEST(ensure_vnc_dir_mkdir_eexist_then_nondir);
 
   /* ensure_vnc_dir: syscall failure propagation */
   RUN_TEST(ensure_vnc_dir_mkdir_fails_not_eexist);
   RUN_TEST(ensure_vnc_dir_mkdir_fails_emits_diagnostic);
-  RUN_TEST(ensure_vnc_dir_lstat_fails_not_enoent);
-  RUN_TEST(ensure_vnc_dir_mkdir_eexist_relstat_fails);
+  RUN_TEST(ensure_vnc_dir_stat_fails_not_enoent);
+  RUN_TEST(ensure_vnc_dir_mkdir_eexist_restat_fails);
 
   /* ensure_vnc_dir: buffer overflow protection */
   RUN_TEST(ensure_vnc_dir_path_too_long);
