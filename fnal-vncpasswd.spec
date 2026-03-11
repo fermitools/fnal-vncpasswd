@@ -5,7 +5,7 @@
 %endif
 
 Name:           fnal-vncpasswd
-Version:        0.1.0
+Version:        0.1.1
 Release:        1%{?dist}
 
 # Only the test_framework is CC-PDDC
@@ -114,5 +114,9 @@ make test
 
 
 %changelog
+* Thu Mar 12 2026 Pat Riehecky <riehecky@fnal.gov> - 0.1.1-1
+- Permit FIPS
+- Permit symlinks
+
 * Mon Feb 16 2026 Pat Riehecky <riehecky@fnal.gov> - 0.1.0-1
 - Initial release
