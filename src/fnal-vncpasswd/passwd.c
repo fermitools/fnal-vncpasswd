@@ -318,22 +318,26 @@ int hash_password(const struct syscall_ops *ops, const char *password,
  * @ops:  Syscall operations.
  * @path: Path of the single component to create.
  *
- * If the path already exists as a directory, returns success. If it exists
- * but is not a directory, returns -1 (errno = ENOTDIR). On EEXIST from
- * mkdir(2), re-stats to confirm the racing creator also made a directory
- * rather than a symlink or regular file.
+ * If the path already exists as a directory or symlink, returns success.
+ * Symlinks are accepted because stat(2) follows them: a symlink to a
+ * directory returns S_IFDIR, and a dangling symlink returns S_IFLNK. Both
+ * are valid managed-path configurations (e.g. ~/.config/vnc -> /net/vnc).
+ * If it exists but is a non-symlink non-directory (regular file, socket,
+ * etc.), returns -1 (errno = ENOTDIR). On EEXIST from mkdir(2), re-stats
+ * to confirm the racing creator also made a directory or symlink rather
+ * than a regular file.
  *
  * Returns 0 on success, -1 on error (errno set).
  */
 static int make_one_dir(const struct syscall_ops *ops, const char *path) {
   struct stat st;
 
-  if (ops->lstat(path, &st) == 0) {
-    if (!S_ISDIR(st.st_mode)) {
+  if (ops->stat(path, &st) == 0) {
+    if (!S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode)) {
       errno = ENOTDIR;
       return -1;
     }
-    return 0; /* Already exists as a directory. */
+    return 0; /* Already exists as a directory or symlink. */
   }
 
   if (errno != ENOENT) {
@@ -345,19 +349,19 @@ static int make_one_dir(const struct syscall_ops *ops, const char *path) {
   }
 
   /*
-   * EEXIST: another process created something here between our lstat() and
-   * mkdir(). Re-stat to verify it is actually a directory.
+   * EEXIST: another process created something here between our stat() and
+   * mkdir(). Re-stat to verify it is actually a directory or symlink.
    */
   if (errno != EEXIST) {
     fprintf(stderr, "fnal-vncpasswd: mkdir %s: %s\n", path, strerror(errno));
     return -1;
   }
 
-  if (ops->lstat(path, &st) < 0) {
+  if (ops->stat(path, &st) < 0) {
     return -1;
   }
 
-  if (!S_ISDIR(st.st_mode)) {
+  if (!S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode)) {
     errno = ENOTDIR;
     return -1;
   }

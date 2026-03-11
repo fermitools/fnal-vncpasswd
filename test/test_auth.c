@@ -160,12 +160,13 @@ static int mock_getpwnam_r(const char *name, struct passwd *pw, char *buf,
  */
 
 static struct {
-  int fail; /* 1 = return -1 / EACCES */
+  int fail;        /* 1 = return -1 / EACCES */
+  int last_flags;  /* flags argument from the most recent call */
 } _cfg_open;
 
 static int mock_open(const char *path, int flags, ...) {
   (void)path;
-  (void)flags;
+  _cfg_open.last_flags = flags;
 
   if (_cfg_open.fail) {
     errno = EACCES;
@@ -650,14 +651,51 @@ TEST(auth_passwd_file_wrong_owner) {
                  "wrong file owner must return PAM_AUTHINFO_UNAVAIL");
 }
 
-TEST(auth_passwd_file_not_regular) {
+TEST(auth_passwd_file_is_directory) {
   struct syscall_ops ops = make_auth_ops();
   int rc;
 
   _cfg_fstat.st_mode = S_IFDIR | 0600; /* directory, not regular file */
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
   TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "non-regular file must return PAM_AUTHINFO_UNAVAIL");
+                 "directory must return PAM_AUTHINFO_UNAVAIL");
+}
+
+TEST(auth_passwd_file_open_missing_o_nofollow) {
+  /*
+   * Regression test: validate_passwd_file() must not pass O_NOFOLLOW to open(2)
+   * so that a symlink at the password file path is rejected at the kernel
+   * level before fstat() is reached.
+   */
+  struct syscall_ops ops = make_auth_ops();
+  int rc;
+
+  cfg_happy_crypt();
+  rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "secret", false);
+  TEST_ASSERT_EQ(rc, PAM_SUCCESS, "happy path must still succeed");
+  TEST_ASSERT_EQ(_cfg_open.last_flags & O_NOFOLLOW, 0,
+                     "open() must not include O_NOFOLLOW");
+}
+
+TEST(auth_passwd_file_is_symlink) {
+  /*
+   * Simulate the kernel rejecting a symlink at the password file path via
+   * ELOOP, which open(2) returns when O_NOFOLLOW is set and the final path
+   * component is a symbolic link.
+   *
+   * This test cannot be expressed via fstat() mode bits: fstat() on an open
+   * fd always reflects the target, never the symlink itself, so S_IFLNK
+   * would never appear in st_mode for a successfully opened fd. The only
+   * reliable mock is to fail open() with ELOOP.
+   */
+  struct syscall_ops ops = make_auth_ops();
+  int rc;
+
+  _cfg_open.fail = 1;
+  errno = ELOOP;
+  rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
+                 "ELOOP from open() must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_group_readable) {
@@ -1003,7 +1041,9 @@ int main(int argc, char **argv) {
   RUN_TEST(auth_passwd_file_open_fails);
   RUN_TEST(auth_passwd_file_fstat_fails);
   RUN_TEST(auth_passwd_file_wrong_owner);
-  RUN_TEST(auth_passwd_file_not_regular);
+  RUN_TEST(auth_passwd_file_is_directory);
+  RUN_TEST(auth_passwd_file_open_missing_o_nofollow);
+  RUN_TEST(auth_passwd_file_is_symlink);
   RUN_TEST(auth_passwd_file_group_readable);
   RUN_TEST(auth_passwd_file_world_readable);
   RUN_TEST(auth_passwd_file_user_executable);
