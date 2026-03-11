@@ -65,6 +65,7 @@ const struct syscall_ops syscall_ops_default = {
 
     /* Cryptographic operations. */
     .crypt_gensalt_ra = crypt_gensalt_ra,
+    .crypt_checksalt = crypt_checksalt,
     .crypt_r = crypt_r,
 
     /* Memory management. */

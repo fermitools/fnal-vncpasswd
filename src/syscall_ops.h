@@ -103,13 +103,16 @@ struct syscall_ops {
    *   - yescrypt ($y$): count is a cost factor (e.g. 5), encoded as params.
    *   - SHA-512  ($6$): count is rounds (e.g. 65536), prefixed "rounds=N$".
    *   - bcrypt   ($2b$): count is log2(rounds) (e.g. 12).
-   * Passing NULL/0 selects the compiled-in preferred algorithm and cost.
+   * Passing NULL/0 selects the compiled-in preferred algorithm and cost,
+   * but it does not account for FIPS blocking the preferred algorithm.
    *
    * crypt_gensalt_ra returns a heap-allocated string (caller must free).
+   * crypt_checksalt verifies the salt is acceptable
    * crypt_r writes to the caller-provided crypt_data buffer (no allocation).
    */
   char *(*crypt_gensalt_ra)(const char *prefix, unsigned long count,
                             const char *rbytes, int nrbytes);
+  int (*crypt_checksalt)(const char *setting);
   char *(*crypt_r)(const char *phrase, const char *setting,
                    struct crypt_data *data);
 

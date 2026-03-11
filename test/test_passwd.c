@@ -44,6 +44,12 @@
  */
 enum { MOCK_FD = 77 };
 
+/*
+ * Must equal SALT_PREFIXES_COUNT in passwd.c. Used to assert exact call counts
+ * in select_prefix tests. Update both if the preference list changes.
+ */
+#define TEST_SALT_PREFIXES_COUNT 5
+
 /* ============================================================================
  * Mock Implementations
  * ============================================================================
@@ -109,40 +115,19 @@ static int mock_getpwuid_r(uid_t uid, struct passwd *pw, char *buf,
   return 0;
 }
 
-/* --- getrandom -------------------------------------------------------------
- */
-
-static struct {
-  int fail;       /* 0 = fill with 0xAA; 1 = return -1 */
-  int short_read; /* return 1 byte at a time until total reached */
-} _cfg_getrandom;
-
-static ssize_t mock_getrandom(void *buf, size_t buflen, unsigned int flags) {
-  (void)flags;
-
-  if (_cfg_getrandom.fail) {
-    errno = EIO;
-    return -1;
-  }
-
-  if (_cfg_getrandom.short_read) {
-    /* Deliver one byte per call to exercise the accumulation loop. */
-    if (buflen == 0) {
-      return 0;
-    }
-    memset(buf, 0xAA, 1);
-    return 1;
-  }
-
-  memset(buf, 0xAA, buflen);
-  return (ssize_t)buflen;
-}
-
 /* --- crypt_gensalt_ra ------------------------------------------------------
+ *
+ * call_count tracks every invocation across both select_prefix() probes and
+ * the final generate_salt() call, enabling precise assertions on iteration
+ * depth. fail_on_call injects a one-shot NULL return without disabling all
+ * subsequent calls, allowing tests to verify that select_prefix() skips a
+ * failed probe and continues to the next prefix.
  */
 
 static struct {
-  int fail; /* 0 = return valid salt; 1 = return NULL */
+  int fail;         /* 1 = always return NULL */
+  int fail_on_call; /* N = return NULL on call N only (0 = disabled) */
+  int call_count;   /* incremented on every invocation */
   char salt[CRYPT_GENSALT_OUTPUT_SIZE];
 } _cfg_crypt_gensalt_ra;
 
@@ -153,12 +138,50 @@ static char *mock_crypt_gensalt_ra(const char *prefix, unsigned long count,
   (void)rbytes;
   (void)nrbytes;
 
+  _cfg_crypt_gensalt_ra.call_count++;
+
   if (_cfg_crypt_gensalt_ra.fail) {
+    return NULL;
+  }
+
+  if (_cfg_crypt_gensalt_ra.fail_on_call != 0 &&
+      _cfg_crypt_gensalt_ra.call_count == _cfg_crypt_gensalt_ra.fail_on_call) {
     return NULL;
   }
 
   /* Return a heap copy; caller is responsible for free(). */
   return strdup(_cfg_crypt_gensalt_ra.salt);
+}
+
+/* --- crypt_checksalt -------------------------------------------------------
+ *
+ * call_count tracks every invocation so tests can verify that select_prefix()
+ * calls crypt_checksalt() exactly once per successfully generated probe salt.
+ * fail_on_call rejects a single specific call; always_fail rejects all calls,
+ * driving select_prefix() to exhaust the preference list and use the fallback.
+ */
+
+static struct {
+  int always_fail;  /* 1 = always return -1 */
+  int fail_on_call; /* N = return -1 on call N only (0 = disabled) */
+  int call_count;   /* incremented on every invocation */
+} _cfg_crypt_checksalt;
+
+static int mock_crypt_checksalt(const char *setting) {
+  (void)setting;
+
+  _cfg_crypt_checksalt.call_count++;
+
+  if (_cfg_crypt_checksalt.always_fail) {
+    return -1;
+  }
+
+  if (_cfg_crypt_checksalt.fail_on_call != 0 &&
+      _cfg_crypt_checksalt.call_count == _cfg_crypt_checksalt.fail_on_call) {
+    return -1;
+  }
+
+  return 0;
 }
 
 /* --- crypt_r ---------------------------------------------------------------
@@ -381,24 +404,26 @@ static int mock_unlink(const char *path) {
  */
 
 /**
- * make_happy_hash_ops - Creates syscall_ops wired for hash_password happy path
+ * make_happy_hash_ops - Creates syscall_ops wired for hash_password happy path.
  *
- * Initializes getrandom, crypt_gensalt_ra, and crypt_r mocks to succeed with
- * deterministic values. Callers override individual fields to inject failures.
+ * Wires crypt_gensalt_ra, crypt_checksalt, and crypt_r mocks. getrandom is
+ * not wired because generate_salt() passes rbytes=NULL to crypt_gensalt_ra(),
+ * letting libxcrypt source its own entropy; getrandom() is never called.
  *
- * Returns: Initialized syscall_ops structure
+ * Callers override individual config fields to inject specific failures.
+ *
+ * Returns: Initialized syscall_ops structure.
  */
 static struct syscall_ops make_happy_hash_ops(void) {
   struct syscall_ops ops = syscall_ops_default;
-  ops.getrandom = mock_getrandom;
   ops.crypt_gensalt_ra = mock_crypt_gensalt_ra;
+  ops.crypt_checksalt = mock_crypt_checksalt;
   ops.crypt_r = mock_crypt_r;
 
-  _cfg_getrandom.fail = 0;
-  _cfg_getrandom.short_read = 0;
+  memset(&_cfg_crypt_gensalt_ra, 0, sizeof(_cfg_crypt_gensalt_ra));
+  memset(&_cfg_crypt_checksalt, 0, sizeof(_cfg_crypt_checksalt));
   snprintf(_cfg_crypt_gensalt_ra.salt, sizeof(_cfg_crypt_gensalt_ra.salt),
            "$6$rounds=65536$testsalt");
-  _cfg_crypt_gensalt_ra.fail = 0;
   _cfg_crypt_r.fail = 0;
   _cfg_crypt_r.star = 0;
   snprintf(_cfg_crypt_r.hash, sizeof(_cfg_crypt_r.hash),
@@ -408,12 +433,12 @@ static struct syscall_ops make_happy_hash_ops(void) {
 
 /**
  * make_happy_atomic_ops - Creates syscall_ops wired for atomic_write happy
- * path
+ * path.
  *
  * Initializes mkostemp, fchmod, write, fsync, close, rename, and unlink mocks
  * to succeed. Callers override individual fields to inject failures.
  *
- * Returns: Initialized syscall_ops structure
+ * Returns: Initialized syscall_ops structure.
  */
 static struct syscall_ops make_happy_atomic_ops(void) {
   struct syscall_ops ops = syscall_ops_default;
@@ -439,12 +464,12 @@ static struct syscall_ops make_happy_atomic_ops(void) {
 }
 
 /**
- * make_dir_ops - Creates syscall_ops wired for ensure_vnc_dir tests
+ * make_dir_ops - Creates syscall_ops wired for ensure_vnc_dir tests.
  *
  * Wires lstat and mkdir mocks and resets their config to zero. Callers set
  * errno_on_first, st_mode_first, fail_errno, etc. to control behaviour.
  *
- * Returns: Initialized syscall_ops structure
+ * Returns: Initialized syscall_ops structure.
  */
 static struct syscall_ops make_dir_ops(void) {
   struct syscall_ops ops = syscall_ops_default;
@@ -457,12 +482,12 @@ static struct syscall_ops make_dir_ops(void) {
 }
 
 /**
- * make_passwd_path_ops - Creates syscall_ops wired for get_passwd_path tests
+ * make_passwd_path_ops - Creates syscall_ops wired for get_passwd_path tests.
  *
  * Default state: lstat reports every component as an existing directory;
  * getpwuid_r resolves uid 1000 with home /home/user.
  *
- * Returns: Initialized syscall_ops structure
+ * Returns: Initialized syscall_ops structure.
  */
 static struct syscall_ops make_passwd_path_ops(void) {
   struct syscall_ops ops = syscall_ops_default;
@@ -547,17 +572,14 @@ TEST(hash_password_zero_hash_len) {
  * ============================================================================
  */
 
-TEST(hash_password_getrandom_fail) {
-  struct syscall_ops ops = make_happy_hash_ops();
-  char buf[VNC_HASH_BUF_SIZE];
-  int rc;
-
-  _cfg_getrandom.fail = 1;
-  rc = hash_password(&ops, "secret", buf, sizeof(buf));
-  TEST_ASSERT_EQ(rc, -1, "getrandom failure must propagate as -1");
-  TEST_ASSERT_EQ(errno, EIO, "failure to get random is EIO");
-}
-
+/*
+ * hash_password_crypt_gensalt_fail - All crypt_gensalt_ra calls return NULL.
+ *
+ * With gensalt always failing, every probe in select_prefix() returns NULL and
+ * is skipped without calling crypt_checksalt(). select_prefix() falls through
+ * to the "$6$" fallback. generate_salt() then calls gensalt("$6$"), which also
+ * returns NULL, and returns -1/EINVAL. crypt_checksalt must never be called.
+ */
 TEST(hash_password_crypt_gensalt_fail) {
   struct syscall_ops ops = make_happy_hash_ops();
   char buf[VNC_HASH_BUF_SIZE];
@@ -567,6 +589,8 @@ TEST(hash_password_crypt_gensalt_fail) {
   rc = hash_password(&ops, "secret", buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, -1, "crypt_gensalt_ra failure must propagate as -1");
   TEST_ASSERT_EQ(errno, EINVAL, "crypt_gensalt_ra failure must set EINVAL");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 0,
+                 "checksalt must not be called when all probes return NULL");
 }
 
 TEST(hash_password_crypt_r_returns_null) {
@@ -607,17 +631,6 @@ TEST(hash_password_success) {
                      "hash buf must contain crypt_r output");
 }
 
-TEST(hash_password_short_getrandom_accumulates) {
-  /* getrandom returning 1 byte at a time must still succeed. */
-  struct syscall_ops ops = make_happy_hash_ops();
-  char buf[VNC_HASH_BUF_SIZE];
-  int rc;
-
-  _cfg_getrandom.short_read = 1;
-  rc = hash_password(&ops, "secret", buf, sizeof(buf));
-  TEST_ASSERT_EQ(rc, 0, "short getrandom reads must accumulate to success");
-}
-
 /*
  * hash_password_hash_buf_too_small - Exercise the crypt_and_copy ERANGE path.
  *
@@ -635,6 +648,109 @@ TEST(hash_password_hash_buf_too_small) {
   TEST_ASSERT_EQ(rc, -1, "hash_len=1 must return -1");
   TEST_ASSERT_EQ(errno, ERANGE, "hash_len=1 must set ERANGE");
   TEST_ASSERT_EQ((int)buf[0], 0, "hash_buf must be zeroed on ERANGE");
+}
+
+/* ============================================================================
+ * Tests: select_prefix - Algorithm selection and fallback
+ *
+ * select_prefix() is static; it is exercised via hash_password(). Call counts
+ * on crypt_gensalt_ra and crypt_checksalt precisely verify iteration depth
+ * and short-circuit behaviour for each scenario.
+ *
+ * Call count arithmetic (N = TEST_SALT_PREFIXES_COUNT):
+ *   - select_prefix() calls gensalt once per prefix entry it probes.
+ *   - generate_salt() calls gensalt once more after select_prefix() returns.
+ *   - crypt_checksalt() is called once per probe that returns a non-NULL salt.
+ * ============================================================================
+ */
+
+/*
+ * select_prefix_first_accepted - crypt_checksalt approves the first probe.
+ *
+ * gensalt call 1: probe for salt_prefixes[0]; checksalt call 1: accept.
+ * select_prefix() returns salt_prefixes[0].
+ * gensalt call 2: actual salt in generate_salt().
+ */
+TEST(select_prefix_first_accepted) {
+  struct syscall_ops ops = make_happy_hash_ops();
+  char buf[VNC_HASH_BUF_SIZE];
+  int rc;
+
+  rc = hash_password(&ops, "secret", buf, sizeof(buf));
+  TEST_ASSERT_EQ(rc, 0, "happy path must return 0");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 1,
+                 "first prefix accepted: checksalt called exactly once");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 2,
+                 "one probe plus one actual salt generation");
+}
+
+/*
+ * select_prefix_second_accepted - checksalt rejects the first probe, accepts
+ * the second.
+ *
+ * gensalt call 1: probe[0]; checksalt call 1: reject.
+ * gensalt call 2: probe[1]; checksalt call 2: accept.
+ * gensalt call 3: actual salt in generate_salt().
+ */
+TEST(select_prefix_second_accepted) {
+  struct syscall_ops ops = make_happy_hash_ops();
+  char buf[VNC_HASH_BUF_SIZE];
+  int rc;
+
+  _cfg_crypt_checksalt.fail_on_call = 1;
+  rc = hash_password(&ops, "secret", buf, sizeof(buf));
+  TEST_ASSERT_EQ(rc, 0, "second prefix accepted must return 0");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 2,
+                 "second prefix accepted: checksalt called exactly twice");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 3,
+                 "two probes plus one actual salt generation");
+}
+
+/*
+ * select_prefix_all_rejected_uses_fallback - checksalt rejects every probe.
+ *
+ * select_prefix() exhausts all TEST_SALT_PREFIXES_COUNT entries and returns
+ * the "$6$" hardcoded fallback. hash_password() must still succeed because
+ * gensalt and crypt_r succeed for that prefix.
+ *
+ * gensalt calls 1..N: one probe per prefix; checksalt calls 1..N: all reject.
+ * gensalt call N+1: actual salt in generate_salt() using the "$6$" fallback.
+ */
+TEST(select_prefix_all_rejected_uses_fallback) {
+  struct syscall_ops ops = make_happy_hash_ops();
+  char buf[VNC_HASH_BUF_SIZE];
+  int rc;
+
+  _cfg_crypt_checksalt.always_fail = 1;
+  rc = hash_password(&ops, "secret", buf, sizeof(buf));
+  TEST_ASSERT_EQ(rc, 0, "fallback prefix must still produce a valid hash");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, TEST_SALT_PREFIXES_COUNT,
+                 "checksalt called once per prefix in the preference list");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, TEST_SALT_PREFIXES_COUNT + 1,
+                 "one probe per prefix plus one actual salt generation");
+}
+
+/*
+ * select_prefix_gensalt_probe_fails - crypt_gensalt_ra returns NULL for the
+ * first probe. select_prefix() must skip that entry without calling
+ * crypt_checksalt() and proceed to the second prefix.
+ *
+ * gensalt call 1: probe[0] returns NULL; checksalt: not called for this entry.
+ * gensalt call 2: probe[1] succeeds; checksalt call 1: accept.
+ * gensalt call 3: actual salt in generate_salt().
+ */
+TEST(select_prefix_gensalt_probe_fails) {
+  struct syscall_ops ops = make_happy_hash_ops();
+  char buf[VNC_HASH_BUF_SIZE];
+  int rc;
+
+  _cfg_crypt_gensalt_ra.fail_on_call = 1;
+  rc = hash_password(&ops, "secret", buf, sizeof(buf));
+  TEST_ASSERT_EQ(rc, 0, "NULL probe must be skipped, not propagated");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 1,
+                 "checksalt called once: only for the accepted second probe");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 3,
+                 "first probe fails, second probe succeeds, one actual salt");
 }
 
 /* ============================================================================
@@ -1271,15 +1387,19 @@ int main(int argc, char **argv) {
   RUN_TEST(hash_password_zero_hash_len);
 
   /* hash_password: syscall failure propagation */
-  RUN_TEST(hash_password_getrandom_fail);
   RUN_TEST(hash_password_crypt_gensalt_fail);
   RUN_TEST(hash_password_crypt_r_returns_null);
   RUN_TEST(hash_password_crypt_r_returns_star);
 
   /* hash_password: happy path and edge cases */
   RUN_TEST(hash_password_success);
-  RUN_TEST(hash_password_short_getrandom_accumulates);
   RUN_TEST(hash_password_hash_buf_too_small);
+
+  /* select_prefix: algorithm selection and fallback */
+  RUN_TEST(select_prefix_first_accepted);
+  RUN_TEST(select_prefix_second_accepted);
+  RUN_TEST(select_prefix_all_rejected_uses_fallback);
+  RUN_TEST(select_prefix_gensalt_probe_fails);
 
   /* ensure_vnc_dir: argument validation */
   RUN_TEST(ensure_vnc_dir_null_ops);

@@ -40,12 +40,45 @@ static int crypt_and_copy(const struct syscall_ops *ops,
                           const char *password, char *hash_buf, size_t hash_len)
     __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2, 3, 4)));
 
+static const char *select_prefix(const struct syscall_ops *ops)
+    __attribute__((warn_unused_result)) __attribute__((nonnull(1)));
+
 static int generate_salt(const struct syscall_ops *ops, char *salt_buf,
                          size_t salt_len) __attribute__((warn_unused_result))
-__attribute__((nonnull(1, 2)));
+    __attribute__((nonnull(1, 2)));
 
 static int make_one_dir(const struct syscall_ops *ops, const char *path)
     __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
+
+/*
+ * Algorithm preference list for select_prefix().
+ *
+ * Ordered from most to least preferred. libxcrypt will reject any algorithm
+ * unavailable in the current configuration (e.g. yescrypt under FIPS).
+ * crypt_checksalt(3) requires a full example salt rather than just the prefix,
+ * so select_prefix() generates a probe salt for each entry to test with.
+ *
+ * NULL as a prefix means "use the libxcrypt compiled-in default" (yescrypt on
+ * RHEL 9+). It appears first so that operator build-time policy takes priority
+ * when it is also acceptable to crypt_checksalt(3).
+ *
+ * SALT_PREFIXES_COUNT must equal the number of entries in salt_prefixes[].
+ * A count-based bound is used instead of a NULL sentinel because NULL is a
+ * valid prefix value; a NULL-terminated loop would silently skip the last
+ * real entry.
+ *
+ * The list is stable: libxcrypt has not added a new algorithm in years and has
+ * no plans to do so. A future RHEL dropping an entry causes select_prefix() to
+ * skip it harmlessly via a NULL return from crypt_gensalt_ra().
+ */
+static const char * const salt_prefixes[] = {
+    NULL,   /* libxcrypt compiled-in default */
+    "$y$",  /* yescrypt */
+    "$2b$", /* bcrypt */
+    "$6$",  /* sha512crypt */
+    "$5$",  /* sha256crypt */
+};
+#define SALT_PREFIXES_COUNT (sizeof(salt_prefixes) / sizeof(salt_prefixes[0]))
 
 /* Password file path resolution */
 
@@ -115,43 +148,60 @@ int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf,
 /* Password hashing */
 
 /*
- * generate_salt - Fill a salt buffer using libxcrypt's preferred algorithm.
+ * select_prefix - Return the best crypt algorithm prefix available at runtime.
+ * @ops: Syscall operations.
+ *
+ * libxcrypt provides no API to enumerate supported or FIPS-approved algorithms;
+ * crypt_checksalt(3) is the only runtime probe. We iterate salt_prefixes[] from
+ * strongest to weakest, generate a candidate salt for each entry, and accept the
+ * first one crypt_checksalt(3) approves. This handles FIPS and non-FIPS systems
+ * without build-time conditionals or /proc inspection.
+ *
+ * If crypt_gensalt_ra() returns NULL for a given prefix (unsupported algorithm),
+ * that entry is skipped without calling crypt_checksalt(3). If all probes fail
+ * or are rejected, "$6$" (sha512crypt) is returned as a last-resort fallback
+ * because it is the strongest FIPS-approved algorithm present across all target
+ * RHEL versions.
+ *
+ * Entropy is sourced internally by libxcrypt (rbytes=NULL, nrbytes=0).
+ * Passing caller-supplied entropy triggers a validation bug in libxcrypt
+ * < 4.4.26 (RHEL 8/9 ship 4.4.18).
+ *
+ * Returns a string literal prefix, never NULL.
+ */
+static const char *select_prefix(const struct syscall_ops *ops) {
+  for (long unsigned int i = 0; i < SALT_PREFIXES_COUNT; i++) {
+    char *probe = ops->crypt_gensalt_ra(salt_prefixes[i], 0, NULL, 0);
+    if (probe == NULL) {
+      continue;
+    }
+    int ok = ops->crypt_checksalt(probe);
+    explicit_bzero(probe, strlen(probe));
+    free(probe);
+    if (ok == 0) {
+      return salt_prefixes[i];
+    }
+  }
+  return "$6$"; /* last-resort fallback */
+}
+
+/*
+ * generate_salt - Fill a salt buffer using the best available algorithm.
  * @ops:      Syscall operations.
  * @salt_buf: Output buffer; CRYPT_GENSALT_OUTPUT_SIZE bytes is sufficient.
  * @salt_len: Size of @salt_buf.
  *
- * crypt_gensalt_ra(3) controls two independent axes:
- *   - prefix (1st arg): algorithm. NULL means "use the compiled-in preferred
- *     algorithm" (yescrypt on RHEL 9+).
- *   - count (2nd arg): work factor. 0 means "use the algorithm's default".
- *
- * getrandom(2) may return fewer bytes than requested before the kernel entropy
- * pool is fully seeded. We loop until enough bytes are collected. GRND_RANDOM
- * is intentionally not set so we block on urandom, not the interrupt-based
- * pool.
+ * Delegates algorithm selection to select_prefix(), which probes libxcrypt
+ * at runtime via crypt_checksalt(3).
  *
  * Returns 0 on success, -1 on error (errno set).
  */
 static int generate_salt(const struct syscall_ops *ops, char *salt_buf,
                          size_t salt_len) {
-  char rbytes[VNC_SALT_BUF_SIZE] = {0};
   char *salt = NULL;
-  size_t total = 0;
   size_t slen = 0;
 
-  while (total < sizeof(rbytes)) {
-    ssize_t got = ops->getrandom(rbytes + total, sizeof(rbytes) - total, 0);
-    if (got < 0) {
-      explicit_bzero(rbytes, sizeof(rbytes));
-      errno = EIO;
-      return -1;
-    }
-    total += (size_t)got;
-  }
-
-  salt = ops->crypt_gensalt_ra(NULL, 0, rbytes, (int)sizeof(rbytes));
-  explicit_bzero(rbytes, sizeof(rbytes)); /* Done with entropy bytes. */
-
+  salt = ops->crypt_gensalt_ra(select_prefix(ops), 0, NULL, 0);
   if (salt == NULL) {
     errno = EINVAL;
     return -1;
