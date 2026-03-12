@@ -24,6 +24,14 @@
 
 #ifdef HAVE_SELINUX
 #include <selinux/restorecon.h>
+#include <selinux/selinux.h>
+#include <stdarg.h>
+
+static int noop_selinux_log(int type, const char *fmt, ...) {
+  (void)type;
+  (void)fmt;
+  return 0;
+}
 #endif
 
 #include "syscall_ops.h"
@@ -537,7 +545,14 @@ int atomic_write_passwd_file(const struct syscall_ops *ops, const char *path,
   }
 
 #ifdef HAVE_SELINUX
-  (void)selinux_restorecon(path, SELINUX_RESTORECON_IGNORE_DIGEST); /* this means --force */
+  {
+    /* quietly suppress all selinux messages for systems where selinux=0 */
+    union selinux_callback cb_saved = selinux_get_callback(SELINUX_CB_LOG);
+    union selinux_callback cb_suppress = { .func_log = noop_selinux_log };
+    selinux_set_callback(SELINUX_CB_LOG, cb_suppress);
+    (void)selinux_restorecon(path, SELINUX_RESTORECON_IGNORE_DIGEST); /* --force */
+    selinux_set_callback(SELINUX_CB_LOG, cb_saved);
+  }
 #endif
 
   return 0;
