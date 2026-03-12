@@ -5,7 +5,7 @@
 %endif
 
 Name:           fnal-vncpasswd
-Version:        0.1.1
+Version:        0.1.2
 Release:        1%{?dist}
 Provides:	fermilab-util_fnal-vncpasswd = %{version}-%{release}
 
@@ -90,6 +90,9 @@ source scl_source enable gcc-toolset-14
 
 
 %changelog
+* Thu Mar 12 2026 Pat Riehecky <riehecky@fnal.gov> - 0.1.2-1
+- Suppress selinux restorecon messages
+
 * Thu Mar 12 2026 Pat Riehecky <riehecky@fnal.gov> - 0.1.1-1
 - Permit FIPS
 - Permit symlinks
