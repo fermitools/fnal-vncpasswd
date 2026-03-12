@@ -7,6 +7,7 @@
 Name:           fnal-vncpasswd
 Version:        0.1.1
 Release:        1%{?dist}
+Provides:	fermilab-util_fnal-vncpasswd = %{version}-%{release}
 
 # Only the test_framework is CC-PDDC
 License:        BSD-3-Clause AND CC-PDDC
@@ -19,7 +20,7 @@ BuildRequires:  cmake >= 3.21
 BuildRequires:  openssl-devel
 BuildRequires:  libbsd-devel
 BuildRequires:  libselinux-devel
-BuildRequires:  libxcrypt-devel
+BuildRequires:  libxcrypt-devel >= 4.4.18
 BuildRequires:  (rubygem-asciidoctor or asciidoc)
 
 %if %{with pam}
@@ -29,8 +30,6 @@ BuildRequires:  pam-devel
 %if 0%{?rhel} < 10
 BuildRequires:	gcc-toolset-14 scl-utils
 %endif
-
-Provides:	fermilab-util_fnal-vncpasswd = %{version}-%{release}
 
 Summary:        Per-user VNC password manager and PAM authentication module
 %description
@@ -61,18 +60,6 @@ You must still configure PAM yourself.
 source scl_source enable gcc-toolset-14
 %endif
 
-%if 0%{?rhel} < 9 && 0%{?fedora} < 31
-mkdir build
-cd build
-%cmake3 \
-    -DVERSION=%{version}  \
-%if %{without pam}
-    -DBUILD_PAM_MODULE:BOOL=OFF \
-%endif
-    -DBUILD_TESTING=ON    \
-    -Wdeprecated ..
-make VERBOSE=2 %{?_smp_mflags}
-%else
 %cmake \
     -DVERSION=%{version}  \
 %if %{without pam}
@@ -80,24 +67,13 @@ make VERBOSE=2 %{?_smp_mflags}
 %endif
     -DBUILD_TESTING=ON
 %cmake_build
-%endif
 
 
 %install
-%if 0%{?rhel} < 9 && 0%{?fedora} < 31
-cd build
-make install DESTDIR=%{buildroot}
-%else
 %cmake_install
-%endif
 
 %check
-%if 0%{?rhel} < 9 && 0%{?fedora} < 31
-cd build
-make test
-%else
 %ctest --output-on-failure
-%endif
 
 %files
 %license LICENSE
