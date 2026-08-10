@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
+
 cmake_minimum_required(VERSION 3.21)
 
 project(fnal-vncpasswd C)

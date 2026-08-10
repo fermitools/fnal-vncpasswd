@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
+
 /**
  * test_vnc_path.c - Unit tests for vnc_path.c
  *

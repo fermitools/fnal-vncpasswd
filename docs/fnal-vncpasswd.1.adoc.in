@@ -113,3 +113,4 @@ will cause authentication to fail with *PAM_AUTHINFO_UNAVAIL*.
 == Authors
 
 Fermi Forward Discovery Group
+SPDX-License-Identifier: BSD-3-Clause

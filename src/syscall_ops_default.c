@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
+
 /*
  * syscall_ops_default.c - Production system call implementation.
  *

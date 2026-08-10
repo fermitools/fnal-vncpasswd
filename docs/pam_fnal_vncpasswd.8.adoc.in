@@ -155,3 +155,4 @@ auth stack regardless of which service types appear in the PAM configuration.
 == Authors
 
 Fermi Forward Discovery Group
+SPDX-License-Identifier: BSD-3-Clause

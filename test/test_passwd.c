@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
+
 /**
  * test_passwd.c - Unit tests for fnal-vncpasswd/passwd.c
  *

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
+
 find_program(ASCIIDOCTOR asciidoctor)
 find_program(ASCIIDOC asciidoc)
 find_program(A2X a2x)

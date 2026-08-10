@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
 # pam/CMakeLists.txt — builds pam_fnal_vncpasswd.so
 #
 # NAMING: PAM modules must not carry the "lib" prefix. dlopen looks for

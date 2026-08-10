@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
 # fnal-vncpasswd/CMakeLists.txt — builds fnal-vncpasswd
 
 add_executable(fnal-vncpasswd main.c passwd.c)
