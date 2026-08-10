@@ -1,6 +1,3 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# SPDX-FileCopyrightText: 2026 Fermi Forward Discovery Group
-
 current_dir:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 version:=$(shell git describe --tags --abbrev=0)
 
