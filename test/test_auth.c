@@ -103,10 +103,12 @@ static int _dummy_pamh_storage;
 /*
  * We need a non-NULL FILE* that is never passed to real libc fread/fwrite.
  * Using a static int avoids heap allocation while remaining a valid non-NULL
- * pointer for our mock fgets/fclose.
+ * pointer for our mock fgets/fclose. The uintptr_t intermediate is a
+ * cast-align-peaceful alias: it yields the same address but tells the
+ * compiler the alignment requirement should not be assumed to increase.
  */
 static int _fake_file_storage;
-#define FAKE_FILE ((FILE *)&_fake_file_storage)
+#define FAKE_FILE ((FILE *)(uintptr_t)&_fake_file_storage)
 
 /* ============================================================================
  * Mock Implementations

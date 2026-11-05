@@ -29,10 +29,12 @@ set(VNC_COMMON_SRCS "${CMAKE_SOURCE_DIR}/src/vnc_path.c"
 # ============================================================================
 set(HAVE_COVERAGE_TOOLS OFF)
 
-if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+# genhtml ships with lcov and is required by both toolchains, so search it once
+# here (not only inside the GCC branch) so the Clang branch can gate on it too.
+find_program(LCOV_EXEC lcov)
+find_program(GENHTML_EXEC genhtml)
 
-  find_program(LCOV_EXEC lcov)
-  find_program(GENHTML_EXEC genhtml)
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
 
   if(LCOV_EXEC AND GENHTML_EXEC)
     set(HAVE_COVERAGE_TOOLS ON)
@@ -68,11 +70,12 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
 
 endif()
 
-# Internal helper: apply coverage flags to a target if tools are present.
+# Internal helper: apply coverage flags (and disable LTO, which would otherwise
+# strip the instrumentation) to a target when tools are present.
 macro(add_coverage_flags target)
   if(HAVE_COVERAGE_TOOLS)
-    target_compile_options(${target} PRIVATE ${COVERAGE_COMPILE_FLAGS})
-    target_link_options(${target} PRIVATE ${COVERAGE_LINK_FLAGS})
+    target_compile_options(${target} PRIVATE ${COVERAGE_COMPILE_FLAGS} -fno-lto)
+    target_link_options(${target} PRIVATE ${COVERAGE_LINK_FLAGS} -fno-lto)
   endif()
 endmacro()
 
@@ -184,18 +187,28 @@ if(BUILD_TESTING AND HAVE_COVERAGE_TOOLS)
 
   elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
 
-    set(PROFILE_DATA ${CMAKE_BINARY_DIR}/default.profdata)
+    set(PROFILE_DATA ${CMAKE_BINARY_DIR}/coverage/default.profdata)
+    # Instrumented processes write their sparse .profraw here. CTest changes
+    # into each test's working directory, so a relative profile pattern would
+    # land elsewhere; use an absolute directory plus a per-process pattern so
+    # every process (and any child it spawns) writes its own file, then merge
+    # them all instead of depending on a single fixed name.
+    set(COVERAGE_PROF_RAW ${CMAKE_BINARY_DIR}/coverage-prof)
     set_property(
       DIRECTORY
       APPEND
-      PROPERTY ADDITIONAL_CLEAN_FILES ${PROFILE_DATA})
+      PROPERTY ADDITIONAL_CLEAN_FILES ${PROFILE_DATA} ${COVERAGE_PROF_RAW})
 
     add_custom_target(
       coverage
-      COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE=default.profraw
+      COMMAND ${CMAKE_COMMAND} -E rm -rf ${COVERAGE_PROF_RAW}
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${COVERAGE_PROF_RAW}
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${COVERAGE_OUTPUT_DIR}
+      COMMAND ${CMAKE_COMMAND} -E env
+              LLVM_PROFILE_FILE=${COVERAGE_PROF_RAW}/default-%p-%m.profraw
               ${CMAKE_CTEST_COMMAND} --output-on-failure
-      COMMAND ${LLVM_PROFDATA_EXEC} merge -sparse default.profraw -o
-              ${PROFILE_DATA}
+      COMMAND ${LLVM_PROFDATA_EXEC} merge -sparse ${COVERAGE_PROF_RAW}/*.profraw
+              -o ${PROFILE_DATA}
       COMMAND
         ${LLVM_COV_EXEC} show ${UNIT_TEST_BINARIES}
         -instr-profile=${PROFILE_DATA} -format=html

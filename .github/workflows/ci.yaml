@@ -6,7 +6,8 @@ permissions:
 on:
   push:
     branches:
-      - main
+      - "**"
+      - "!gh-pages"
   pull_request:
     branches:
       - main
@@ -14,24 +15,47 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
 
-    name: Test compile
+    # Build and test under each supported C compiler. The CMake coverage target
+    # branches on CMAKE_C_COMPILER_ID, so forwarding the chosen compiler via CC
+    # exercises the full GCC and Clang pipelines, including each toolchain's own
+    # coverage tools (lcov for GCC, llvm-cov for Clang).
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - gcc
+          - clang
+
+    env:
+      # Forward the chosen compiler to CMake via CC.
+      CC: ${{ matrix.compiler }}
+
+    name: Test compile (${{ matrix.compiler }})
 
     steps:
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-               cmake \
-               gcc \
-               lcov \
-               asciidoctor \
-               libcrypt-dev \
-               libpam0g-dev \
-               libbsd-dev \
-               libselinux1-dev \
-               libssl-dev \
-               pkg-config
+          dnf -y update
+          dnf -y install \
+            gcc \
+            gcc-c++ \
+            make \
+            cmake \
+            git \
+            libxcrypt-devel \
+            openssl-devel \
+            libselinux-devel \
+            libbsd-devel \
+            pam-devel \
+            asciidoctor \
+            lcov
+          # clang + LLVM coverage tools.
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            dnf -y install clang clang-devel llvm
+          fi
 
       - name: Checkout
         uses: actions/checkout@v6
