@@ -69,8 +69,7 @@ int build_vnc_passwd_path(const char *home_dir, char *buf, size_t buflen) {
     return -1;
   }
 
-  n = snprintf(buf, buflen, "%s/%s/%s", home_dir, VNC_PASSWD_DIR,
-               VNC_PASSWD_FILENAME);
+  n = snprintf(buf, buflen, "%s/%s/%s", home_dir, VNC_PASSWD_DIR, VNC_PASSWD_FILENAME);
   /* LCOV_EXCL_BR_START - n < 0 unreachable: no wide-char conversions */
   if (n < 0 || (size_t)n >= buflen) {
     /* LCOV_EXCL_BR_STOP */

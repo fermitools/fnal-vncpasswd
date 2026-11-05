@@ -47,35 +47,23 @@
  * public entry point validates its pointer arguments before delegating.
  */
 
-static int validate_passwd_file(const struct syscall_ops *ops, const char *path,
-                                uid_t expected_uid)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
+static int validate_passwd_file(const struct syscall_ops *ops, const char *path, uid_t expected_uid) __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
 
-static int verify_password(const struct syscall_ops *ops, const char *password,
-                           const char *stored_hash)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2, 3)));
+static int verify_password(const struct syscall_ops *ops, const char *password, const char *stored_hash) __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2, 3)));
 
-static int open_and_read_passwd_hash(const struct syscall_ops *ops,
-                                     const pam_handle_t *pamh, int *pam_result,
-                                     const char *username, char *hash_buf,
-                                     size_t hash_len, bool debug)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1, 3, 4, 5)));
+static int open_and_read_passwd_hash(const struct syscall_ops *ops, const pam_handle_t *pamh, int *pam_result, const char *username, char *hash_buf, size_t hash_len, bool debug) __attribute__((warn_unused_result))
+__attribute__((nonnull(1, 3, 4, 5)));
 
-static inline int vnc_const_memcmp(const void *a, const void *b, size_t len)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
+static inline int vnc_const_memcmp(const void *a, const void *b, size_t len) __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
 
 /* Constant-time comparison */
 
 #if defined(HAVE_OPENSSL) || defined(HAVE_LIBRESSL)
 #include <openssl/crypto.h>
-static inline int vnc_const_memcmp(const void *a, const void *b, size_t len) {
-  return CRYPTO_memcmp(a, b, len);
-}
+static inline int vnc_const_memcmp(const void *a, const void *b, size_t len) { return CRYPTO_memcmp(a, b, len); }
 #elif defined(HAVE_GNUTLS)
 #include <gnutls/gnutls.h>
-static inline int vnc_const_memcmp(const void *a, const void *b, size_t len) {
-  return gnutls_memcmp(a, b, len);
-}
+static inline int vnc_const_memcmp(const void *a, const void *b, size_t len) { return gnutls_memcmp(a, b, len); }
 #endif
 
 /* PAM argument parsing */
@@ -98,8 +86,7 @@ void parse_pam_args(int argc, const char **argv, struct pam_args *args) {
 
 /* Password file validation */
 
-static int validate_passwd_file(const struct syscall_ops *ops, const char *path,
-                                uid_t expected_uid) {
+static int validate_passwd_file(const struct syscall_ops *ops, const char *path, uid_t expected_uid) {
   struct stat st = {0};
   int fd = -1;
 
@@ -125,9 +112,7 @@ static int validate_passwd_file(const struct syscall_ops *ops, const char *path,
    * Reject non-regular files, wrong owner, any executable bit, or
    * group/world read-write access.
    */
-  if (!S_ISREG(st.st_mode) || st.st_uid != expected_uid ||
-      (st.st_mode &
-       (S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH))) {
+  if (!S_ISREG(st.st_mode) || st.st_uid != expected_uid || (st.st_mode & (S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH))) {
     ops->close(fd);
     errno = EPERM;
     return -1;
@@ -138,8 +123,7 @@ static int validate_passwd_file(const struct syscall_ops *ops, const char *path,
 
 /* Password verification */
 
-static int verify_password(const struct syscall_ops *ops, const char *password,
-                           const char *stored_hash) {
+static int verify_password(const struct syscall_ops *ops, const char *password, const char *stored_hash) {
   struct crypt_data cd; /* custom mutible struct can't be init here */
   char *computed = NULL;
   int result = -1;
@@ -186,10 +170,7 @@ static int verify_password(const struct syscall_ops *ops, const char *password,
  *
  * Returns 0 on success, -1 with *pam_result set on failure.
  */
-static int open_and_read_passwd_hash(const struct syscall_ops *ops,
-                                     const pam_handle_t *pamh, int *pam_result,
-                                     const char *username, char *hash_buf,
-                                     size_t hash_len, bool debug) {
+static int open_and_read_passwd_hash(const struct syscall_ops *ops, const pam_handle_t *pamh, int *pam_result, const char *username, char *hash_buf, size_t hash_len, bool debug) {
   struct passwd pw = {0};
   struct passwd *pwresult = {0};
   /* Conventional fixed size; see pam_unix and glibc documentation. */
@@ -200,8 +181,7 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
   int saved_errno = 0;
   int fd = -1;
 
-  if (ops->getpwnam_r(username, &pw, pwbuf, sizeof(pwbuf), &pwresult) != 0 ||
-      pwresult == NULL) {
+  if (ops->getpwnam_r(username, &pw, pwbuf, sizeof(pwbuf), &pwresult) != 0 || pwresult == NULL) {
     /*
      * PAM_USER_UNKNOWN rather than PAM_AUTH_ERR is standard behavior
      * (cf. pam_unix): it lets stacked modules gate access early without
@@ -209,8 +189,7 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
      */
     if (debug) {
       saved_errno = errno;
-      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-                 "pam_fnal_vncpasswd: getpwnam_r: user not found");
+      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: getpwnam_r: user not found");
       errno = saved_errno;
     }
     *pam_result = PAM_USER_UNKNOWN;
@@ -218,9 +197,7 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
   }
 
   if (debug) {
-    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-               "pam_fnal_vncpasswd: getpwnam_r: resolved uid=%lu",
-               (unsigned long)pw.pw_uid);
+    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: getpwnam_r: resolved uid=%lu", (unsigned long)pw.pw_uid);
   }
 
   if (pw.pw_uid != getuid()) {
@@ -238,13 +215,11 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
 
   /* Treat "/" as an invalid home directory. */
   /* LCOV_EXCL_BR_START - compiler optimizes so branches hard to trace */
-  if (pw.pw_dir == NULL || pw.pw_dir[0] != '/' ||
-      (pw.pw_dir[0] == '/' && pw.pw_dir[1] == '\0')) {
+  if (pw.pw_dir == NULL || pw.pw_dir[0] != '/' || (pw.pw_dir[0] == '/' && pw.pw_dir[1] == '\0')) {
     /* LCOV_EXCL_BR_STOP */
     if (debug) {
       saved_errno = errno;
-      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-                 "pam_fnal_vncpasswd: no home directory in passwd entry");
+      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: no home directory in passwd entry");
       errno = saved_errno;
     }
     *pam_result = PAM_USER_UNKNOWN;
@@ -254,9 +229,7 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
   if (build_vnc_passwd_path(pw.pw_dir, passwd_path, sizeof(passwd_path)) < 0) {
     if (debug) {
       saved_errno = errno;
-      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-                 "pam_fnal_vncpasswd: build_vnc_passwd_path failed: errno=%d",
-                 saved_errno);
+      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: build_vnc_passwd_path failed: errno=%d", saved_errno);
       errno = saved_errno;
     }
     *pam_result = PAM_AUTH_ERR;
@@ -278,8 +251,7 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
   }
 
   if (debug) {
-    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-               "pam_fnal_vncpasswd: password file opened and validated");
+    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: password file opened and validated");
   }
 
   /*
@@ -308,8 +280,7 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
    * locale-dependent matching on a crypt(3) hash string.
    */
   len = strlen(hash_buf);
-  while (len > 0 && (hash_buf[len - 1] == '\r' || hash_buf[len - 1] == '\n' ||
-                     hash_buf[len - 1] == ' ')) {
+  while (len > 0 && (hash_buf[len - 1] == '\r' || hash_buf[len - 1] == '\n' || hash_buf[len - 1] == ' ')) {
     hash_buf[--len] = '\0';
   }
 
@@ -320,16 +291,13 @@ static int open_and_read_passwd_hash(const struct syscall_ops *ops,
   }
 
   if (debug) {
-    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-               "pam_fnal_vncpasswd: stored hash read successfully");
+    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: stored hash read successfully");
   }
 
   return 0;
 }
 
-int authenticate_vnc_user(const struct syscall_ops *ops,
-                          const pam_handle_t *pamh, const char *username,
-                          const char *password, bool debug) {
+int authenticate_vnc_user(const struct syscall_ops *ops, const pam_handle_t *pamh, const char *username, const char *password, bool debug) {
   char hash[VNC_HASH_BUF_SIZE] = {0};
   int result;
 
@@ -344,8 +312,7 @@ int authenticate_vnc_user(const struct syscall_ops *ops,
   }
 
   if (debug) {
-    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-               "pam_fnal_vncpasswd: version=%s", VERSION);
+    pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: version=%s", VERSION);
   }
 
   /*
@@ -353,8 +320,7 @@ int authenticate_vnc_user(const struct syscall_ops *ops,
    * set by fnal-vncpasswd will produce a mismatched hash and fail naturally.
    * Policy enforcement belongs in the password-setting tool.
    */
-  if (open_and_read_passwd_hash(ops, pamh, &result, username, hash,
-                                sizeof(hash), debug) < 0) {
+  if (open_and_read_passwd_hash(ops, pamh, &result, username, hash, sizeof(hash), debug) < 0) {
     explicit_bzero(hash, sizeof(hash));
     return result;
   }
@@ -364,11 +330,9 @@ int authenticate_vnc_user(const struct syscall_ops *ops,
 
   if (debug) {
     if (result == PAM_SUCCESS) {
-      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-                 "pam_fnal_vncpasswd: password verification: success");
+      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: password verification: success");
     } else {
-      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG,
-                 "pam_fnal_vncpasswd: password verification: failed");
+      pam_syslog((pam_handle_t *)(uintptr_t)(pamh), LOG_DEBUG, "pam_fnal_vncpasswd: password verification: failed");
     }
   }
 

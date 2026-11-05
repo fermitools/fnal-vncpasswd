@@ -41,8 +41,7 @@
  *   EINVAL  @home_dir is NULL or empty, @buf is NULL, or @buflen is 0.
  *   ERANGE  Constructed path exceeds @buflen.
  */
-int build_vnc_dir_path(const char *home_dir, char *buf, size_t buflen)
-    __attribute__((warn_unused_result));
+int build_vnc_dir_path(const char *home_dir, char *buf, size_t buflen) __attribute__((warn_unused_result));
 
 /*
  * build_vnc_passwd_path - Construct the VNC password file path.
@@ -57,7 +56,6 @@ int build_vnc_dir_path(const char *home_dir, char *buf, size_t buflen)
  *   EINVAL  @home_dir is NULL or empty, @buf is NULL, or @buflen is 0.
  *   ERANGE  Constructed path exceeds @buflen.
  */
-int build_vnc_passwd_path(const char *home_dir, char *buf, size_t buflen)
-    __attribute__((warn_unused_result));
+int build_vnc_passwd_path(const char *home_dir, char *buf, size_t buflen) __attribute__((warn_unused_result));
 
 #endif /* VNC_PATH_H */

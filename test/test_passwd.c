@@ -82,8 +82,7 @@ static struct {
   char pw_dir[PATH_MAX];
 } _cfg_getpwuid_r;
 
-static int mock_getpwuid_r(uid_t uid, struct passwd *pw, char *buf,
-                           size_t buflen, struct passwd **result) {
+static int mock_getpwuid_r(uid_t uid, struct passwd *pw, char *buf, size_t buflen, struct passwd **result) {
   int dir_written;
   char *name_start;
   size_t name_space;
@@ -134,8 +133,7 @@ static struct {
   char salt[CRYPT_GENSALT_OUTPUT_SIZE];
 } _cfg_crypt_gensalt_ra;
 
-static char *mock_crypt_gensalt_ra(const char *prefix, unsigned long count,
-                                   const char *rbytes, int nrbytes) {
+static char *mock_crypt_gensalt_ra(const char *prefix, unsigned long count, const char *rbytes, int nrbytes) {
   (void)prefix;
   (void)count;
   (void)rbytes;
@@ -147,8 +145,7 @@ static char *mock_crypt_gensalt_ra(const char *prefix, unsigned long count,
     return NULL;
   }
 
-  if (_cfg_crypt_gensalt_ra.fail_on_call != 0 &&
-      _cfg_crypt_gensalt_ra.call_count == _cfg_crypt_gensalt_ra.fail_on_call) {
+  if (_cfg_crypt_gensalt_ra.fail_on_call != 0 && _cfg_crypt_gensalt_ra.call_count == _cfg_crypt_gensalt_ra.fail_on_call) {
     return NULL;
   }
 
@@ -179,8 +176,7 @@ static int mock_crypt_checksalt(const char *setting) {
     return -1;
   }
 
-  if (_cfg_crypt_checksalt.fail_on_call != 0 &&
-      _cfg_crypt_checksalt.call_count == _cfg_crypt_checksalt.fail_on_call) {
+  if (_cfg_crypt_checksalt.fail_on_call != 0 && _cfg_crypt_checksalt.call_count == _cfg_crypt_checksalt.fail_on_call) {
     return -1;
   }
 
@@ -196,8 +192,7 @@ static struct {
   char hash[CRYPT_OUTPUT_SIZE];
 } _cfg_crypt_r;
 
-static char *mock_crypt_r(const char *phrase, const char *setting,
-                          struct crypt_data *data) {
+static char *mock_crypt_r(const char *phrase, const char *setting, struct crypt_data *data) {
   (void)phrase;
   (void)setting;
 
@@ -246,8 +241,7 @@ static int mock_stat(const char *path, struct stat *st) {
   }
 
   memset(st, 0, sizeof(*st));
-  st->st_mode =
-      (call == 1) ? _cfg_stat.st_mode_first : _cfg_stat.st_mode_second;
+  st->st_mode = (call == 1) ? _cfg_stat.st_mode_first : _cfg_stat.st_mode_second;
   return 0;
 }
 
@@ -430,12 +424,10 @@ static struct syscall_ops make_happy_hash_ops(void) {
 
   memset(&_cfg_crypt_gensalt_ra, 0, sizeof(_cfg_crypt_gensalt_ra));
   memset(&_cfg_crypt_checksalt, 0, sizeof(_cfg_crypt_checksalt));
-  snprintf(_cfg_crypt_gensalt_ra.salt, sizeof(_cfg_crypt_gensalt_ra.salt),
-           "$6$rounds=65536$testsalt");
+  snprintf(_cfg_crypt_gensalt_ra.salt, sizeof(_cfg_crypt_gensalt_ra.salt), "$6$rounds=65536$testsalt");
   _cfg_crypt_r.fail = 0;
   _cfg_crypt_r.star = 0;
-  snprintf(_cfg_crypt_r.hash, sizeof(_cfg_crypt_r.hash),
-           "$6$rounds=65536$testsalt$AAABBBCCC");
+  snprintf(_cfg_crypt_r.hash, sizeof(_cfg_crypt_r.hash), "$6$rounds=65536$testsalt$AAABBBCCC");
   return ops;
 }
 
@@ -600,8 +592,7 @@ TEST(hash_password_crypt_gensalt_fail) {
   rc = hash_password(&ops, "secret", buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, -1, "crypt_gensalt_ra failure must propagate as -1");
   TEST_ASSERT_EQ(errno, EINVAL, "crypt_gensalt_ra failure must set EINVAL");
-  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 0,
-                 "checksalt must not be called when all probes return NULL");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 0, "checksalt must not be called when all probes return NULL");
 }
 
 TEST(hash_password_crypt_r_returns_null) {
@@ -638,8 +629,7 @@ TEST(hash_password_success) {
 
   rc = hash_password(&ops, "secret", buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, 0, "happy path must return 0");
-  TEST_ASSERT_STR_EQ(buf, _cfg_crypt_r.hash,
-                     "hash buf must contain crypt_r output");
+  TEST_ASSERT_STR_EQ(buf, _cfg_crypt_r.hash, "hash buf must contain crypt_r output");
 }
 
 /*
@@ -689,10 +679,8 @@ TEST(select_prefix_first_accepted) {
 
   rc = hash_password(&ops, "secret", buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, 0, "happy path must return 0");
-  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 1,
-                 "first prefix accepted: checksalt called exactly once");
-  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 2,
-                 "one probe plus one actual salt generation");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 1, "first prefix accepted: checksalt called exactly once");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 2, "one probe plus one actual salt generation");
 }
 
 /*
@@ -711,10 +699,8 @@ TEST(select_prefix_second_accepted) {
   _cfg_crypt_checksalt.fail_on_call = 1;
   rc = hash_password(&ops, "secret", buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, 0, "second prefix accepted must return 0");
-  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 2,
-                 "second prefix accepted: checksalt called exactly twice");
-  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 3,
-                 "two probes plus one actual salt generation");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 2, "second prefix accepted: checksalt called exactly twice");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 3, "two probes plus one actual salt generation");
 }
 
 /*
@@ -735,10 +721,8 @@ TEST(select_prefix_all_rejected_uses_fallback) {
   _cfg_crypt_checksalt.always_fail = 1;
   rc = hash_password(&ops, "secret", buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, 0, "fallback prefix must still produce a valid hash");
-  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, TEST_SALT_PREFIXES_COUNT,
-                 "checksalt called once per prefix in the preference list");
-  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, TEST_SALT_PREFIXES_COUNT + 1,
-                 "one probe per prefix plus one actual salt generation");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, TEST_SALT_PREFIXES_COUNT, "checksalt called once per prefix in the preference list");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, TEST_SALT_PREFIXES_COUNT + 1, "one probe per prefix plus one actual salt generation");
 }
 
 /*
@@ -758,10 +742,8 @@ TEST(select_prefix_gensalt_probe_fails) {
   _cfg_crypt_gensalt_ra.fail_on_call = 1;
   rc = hash_password(&ops, "secret", buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, 0, "NULL probe must be skipped, not propagated");
-  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 1,
-                 "checksalt called once: only for the accepted second probe");
-  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 3,
-                 "first probe fails, second probe succeeds, one actual salt");
+  TEST_ASSERT_EQ(_cfg_crypt_checksalt.call_count, 1, "checksalt called once: only for the accepted second probe");
+  TEST_ASSERT_EQ(_cfg_crypt_gensalt_ra.call_count, 3, "first probe fails, second probe succeeds, one actual salt");
 }
 
 /* ============================================================================
@@ -1044,8 +1026,7 @@ TEST(ensure_vnc_dir_mkdir_fails_emits_diagnostic) {
   TEST_ASSERT_EQ(pipe(pipefd), 0, "pipe() must succeed");
 
   saved_stderr = dup(STDERR_FILENO);
-  TEST_ASSERT_EQ(dup2(pipefd[1], STDERR_FILENO), STDERR_FILENO,
-                 "dup2() must redirect stderr");
+  TEST_ASSERT_EQ(dup2(pipefd[1], STDERR_FILENO), STDERR_FILENO, "dup2() must redirect stderr");
   close(pipefd[1]);
 
   rc = ensure_vnc_dir(&ops, "/a/b");
@@ -1174,8 +1155,7 @@ TEST(atomic_write_fchmod_fails_unlinks_tmp) {
   _cfg_fchmod.fail = 1;
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
   TEST_ASSERT_EQ(rc, -1, "fchmod failure must return -1");
-  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1,
-                 "tmp file must be unlinked on fchmod failure");
+  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1, "tmp file must be unlinked on fchmod failure");
   TEST_ASSERT_EQ(errno, EPERM, "original fchmod errno must be restored");
 }
 
@@ -1186,8 +1166,7 @@ TEST(atomic_write_write_fails_unlinks_tmp) {
   _cfg_write.fail = 1;
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
   TEST_ASSERT_EQ(rc, -1, "write failure must return -1");
-  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1,
-                 "tmp file must be unlinked on write failure");
+  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1, "tmp file must be unlinked on write failure");
   TEST_ASSERT_EQ(errno, EIO, "errno remains from caller");
 }
 
@@ -1199,8 +1178,7 @@ TEST(atomic_write_short_write_unlinks_tmp) {
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
   TEST_ASSERT_EQ(rc, -1, "short write must return -1");
   TEST_ASSERT_EQ(errno, EIO, "short write must set EIO");
-  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1,
-                 "tmp file must be unlinked on short write");
+  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1, "tmp file must be unlinked on short write");
 }
 
 TEST(atomic_write_fsync_fails_unlinks_tmp) {
@@ -1210,8 +1188,7 @@ TEST(atomic_write_fsync_fails_unlinks_tmp) {
   _cfg_fsync.fail = 1;
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
   TEST_ASSERT_EQ(rc, -1, "fsync failure must return -1");
-  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1,
-                 "tmp file must be unlinked on fsync failure");
+  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1, "tmp file must be unlinked on fsync failure");
   TEST_ASSERT_EQ(errno, EIO, "errno remains from caller");
 }
 
@@ -1222,8 +1199,7 @@ TEST(atomic_write_close_fails_unlinks_tmp) {
   _cfg_close.fail = 1;
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
   TEST_ASSERT_EQ(rc, -1, "close failure must return -1");
-  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1,
-                 "tmp file must be unlinked on close failure");
+  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1, "tmp file must be unlinked on close failure");
   TEST_ASSERT_EQ(errno, EIO, "errno remains from caller");
 }
 
@@ -1234,8 +1210,7 @@ TEST(atomic_write_rename_fails_unlinks_tmp) {
   _cfg_rename.fail = 1;
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
   TEST_ASSERT_EQ(rc, -1, "rename failure must return -1");
-  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1,
-                 "tmp file must be unlinked on rename failure");
+  TEST_ASSERT_EQ(_cfg_unlink.call_count, 1, "tmp file must be unlinked on rename failure");
   TEST_ASSERT_EQ(errno, EROFS, "errno remains from caller");
 }
 
@@ -1251,8 +1226,7 @@ TEST(atomic_write_success) {
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
   TEST_ASSERT_EQ(rc, 0, "happy path must return 0");
   TEST_ASSERT_EQ(_cfg_unlink.call_count, 0, "no unlink on success");
-  TEST_ASSERT_STR_EQ(_cfg_rename.captured_dst, "/some/path",
-                     "rename destination must be the target path");
+  TEST_ASSERT_STR_EQ(_cfg_rename.captured_dst, "/some/path", "rename destination must be the target path");
 }
 
 TEST(atomic_write_content_has_newline) {
@@ -1264,10 +1238,8 @@ TEST(atomic_write_content_has_newline) {
 
   rc = atomic_write_passwd_file(&ops, "/some/path", hash);
   expected_len = strlen(hash) + 1; /* +1 for '\n' */
-  TEST_ASSERT_EQ(_cfg_write.captured_len, expected_len,
-                 "written length must be hash + newline");
-  TEST_ASSERT_EQ((int)_cfg_write.captured[expected_len - 1], (int)'\n',
-                 "last written byte must be newline");
+  TEST_ASSERT_EQ(_cfg_write.captured_len, expected_len, "written length must be hash + newline");
+  TEST_ASSERT_EQ((int)_cfg_write.captured[expected_len - 1], (int)'\n', "last written byte must be newline");
   TEST_ASSERT_EQ(rc, 0, "happy path must return 0");
 }
 
@@ -1277,9 +1249,7 @@ TEST(atomic_write_tmp_path_template) {
   int rc;
 
   rc = atomic_write_passwd_file(&ops, "/some/path", "$6$hash");
-  TEST_ASSERT_EQ(
-      strncmp(_cfg_mkostemp.captured_tmpl, "/some/path", strlen("/some/path")),
-      0, "mkostemp template must start with target path");
+  TEST_ASSERT_EQ(strncmp(_cfg_mkostemp.captured_tmpl, "/some/path", strlen("/some/path")), 0, "mkostemp template must start with target path");
   TEST_ASSERT_EQ(rc, 0, "happy path must return 0");
 }
 
@@ -1429,12 +1399,10 @@ TEST(get_passwd_path_success) {
   char expected[PATH_MAX];
   int rc;
 
-  snprintf(expected, sizeof(expected), "/home/user/%s/%s", VNC_PASSWD_DIR,
-           VNC_PASSWD_FILENAME);
+  snprintf(expected, sizeof(expected), "/home/user/%s/%s", VNC_PASSWD_DIR, VNC_PASSWD_FILENAME);
   rc = get_passwd_path(&ops, 1000, buf, sizeof(buf));
   TEST_ASSERT_EQ(rc, 0, "happy path must return 0");
-  TEST_ASSERT_STR_EQ(buf, expected,
-                     "path must point to per-user vnc passwd file");
+  TEST_ASSERT_STR_EQ(buf, expected, "path must point to per-user vnc passwd file");
 }
 
 /* ============================================================================

@@ -80,10 +80,8 @@ struct syscall_ops {
    * error semantics, and privilege level; a shared wrapper would add
    * complexity for no gain.
    */
-  int (*getpwnam_r)(const char *name, struct passwd *pwd, char *buf,
-                    size_t buflen, struct passwd **result);
-  int (*getpwuid_r)(uid_t uid, struct passwd *pwd, char *buf, size_t buflen,
-                    struct passwd **result);
+  int (*getpwnam_r)(const char *name, struct passwd *pwd, char *buf, size_t buflen, struct passwd **result);
+  int (*getpwuid_r)(uid_t uid, struct passwd *pwd, char *buf, size_t buflen, struct passwd **result);
 
   /*
    * Entropy generation.
@@ -113,11 +111,9 @@ struct syscall_ops {
    * crypt_checksalt verifies the salt is acceptable
    * crypt_r writes to the caller-provided crypt_data buffer (no allocation).
    */
-  char *(*crypt_gensalt_ra)(const char *prefix, unsigned long count,
-                            const char *rbytes, int nrbytes);
+  char *(*crypt_gensalt_ra)(const char *prefix, unsigned long count, const char *rbytes, int nrbytes);
   int (*crypt_checksalt)(const char *setting);
-  char *(*crypt_r)(const char *phrase, const char *setting,
-                   struct crypt_data *data);
+  char *(*crypt_r)(const char *phrase, const char *setting, struct crypt_data *data);
 
   /*
    * Memory management.

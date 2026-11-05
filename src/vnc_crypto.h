@@ -23,10 +23,8 @@ enum {
 };
 
 _Static_assert(VNC_HASH_BUF_SIZE > 0, "hash buffer size is 0");
-_Static_assert(VNC_HASH_BUF_SIZE <= INT_MAX,
-               "hash buffer exceeds fgets limit!");
-_Static_assert(VNC_SALT_BUF_SIZE <= INT_MAX,
-               "salt buffer exceeds fgets limit!");
+_Static_assert(VNC_HASH_BUF_SIZE <= INT_MAX, "hash buffer exceeds fgets limit!");
+_Static_assert(VNC_SALT_BUF_SIZE <= INT_MAX, "salt buffer exceeds fgets limit!");
 _Static_assert(VNC_SALT_BUF_SIZE > 0, "salt buffer size is 0");
 
 #endif /* VNC_CRYPTO_H */

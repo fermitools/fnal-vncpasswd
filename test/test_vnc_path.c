@@ -40,9 +40,7 @@
  * Computes the expected path using the same format as the implementation so
  * tests do not hardcode the separator character.
  */
-static void expected_dir_path(const char *home, char *buf, size_t n) {
-  snprintf(buf, n, "%s/%s", home, VNC_PASSWD_DIR);
-}
+static void expected_dir_path(const char *home, char *buf, size_t n) { snprintf(buf, n, "%s/%s", home, VNC_PASSWD_DIR); }
 
 /**
  * expected_passwd_path - Compute expected VNC password file path into caller
@@ -54,9 +52,7 @@ static void expected_dir_path(const char *home, char *buf, size_t n) {
  * Computes the expected path using the same format as the implementation so
  * tests do not hardcode the separator character.
  */
-static void expected_passwd_path(const char *home, char *buf, size_t n) {
-  snprintf(buf, n, "%s/%s/%s", home, VNC_PASSWD_DIR, VNC_PASSWD_FILENAME);
-}
+static void expected_passwd_path(const char *home, char *buf, size_t n) { snprintf(buf, n, "%s/%s/%s", home, VNC_PASSWD_DIR, VNC_PASSWD_FILENAME); }
 
 /* ============================================================================
  * Tests: build_vnc_dir_path - Argument validation
@@ -159,8 +155,7 @@ TEST(dir_path_exact_fit) {
   TEST_ASSERT_NOT_EQ(buf, NULL, "malloc must succeed");
   rc = build_vnc_dir_path("/home/user", buf, exact);
   TEST_ASSERT_EQ(rc, 0, "exact-fit buffer must return 0");
-  TEST_ASSERT_STR_EQ(buf, expected,
-                     "exact-fit buffer must contain correct path");
+  TEST_ASSERT_STR_EQ(buf, expected, "exact-fit buffer must contain correct path");
   free(buf);
 }
 
@@ -269,8 +264,7 @@ TEST(passwd_path_exact_fit) {
   TEST_ASSERT_NOT_EQ(buf, NULL, "malloc must succeed");
   rc = build_vnc_passwd_path("/home/user", buf, exact);
   TEST_ASSERT_EQ(rc, 0, "exact-fit buffer must return 0");
-  TEST_ASSERT_STR_EQ(buf, expected,
-                     "exact-fit buffer must contain correct path");
+  TEST_ASSERT_STR_EQ(buf, expected, "exact-fit buffer must contain correct path");
   free(buf);
 }
 
@@ -310,8 +304,7 @@ TEST(passwd_path_differs_from_dir_path) {
 
   TEST_ASSERT_EQ(ret1, 0, "should not error out");
   TEST_ASSERT_EQ(ret2, 0, "should not error out");
-  TEST_ASSERT_STR_NOT_EQ(dir_buf, passwd_buf,
-                         "dir path and passwd path must differ");
+  TEST_ASSERT_STR_NOT_EQ(dir_buf, passwd_buf, "dir path and passwd path must differ");
 }
 
 TEST(passwd_path_is_under_dir_path) {
@@ -329,10 +322,8 @@ TEST(passwd_path_is_under_dir_path) {
   TEST_ASSERT_EQ(ret2, 0, "should not error out");
 
   dir_len = strlen(dir_buf);
-  TEST_ASSERT_EQ(strncmp(passwd_buf, dir_buf, dir_len), 0,
-                 "passwd path must start with dir path");
-  TEST_ASSERT_EQ((int)passwd_buf[dir_len], (int)'/',
-                 "dir path must be followed by '/'");
+  TEST_ASSERT_EQ(strncmp(passwd_buf, dir_buf, dir_len), 0, "passwd path must start with dir path");
+  TEST_ASSERT_EQ((int)passwd_buf[dir_len], (int)'/', "dir path must be followed by '/'");
 }
 
 /* ============================================================================
