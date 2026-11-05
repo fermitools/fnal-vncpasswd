@@ -56,7 +56,6 @@ add_compile_options(
   -Wcast-align # Warn on alignment-affecting casts
   -Wcast-qual # Warn on cast removing const/volatile
   -Wconversion # Implicit conversion warnings
-  -Wdisabled-optimization # Optimization disabled
   -Wdouble-promotion # Implicit float-to-double promotion
   -Werror=implicit-function-declaration # Error on implicit declarations
   -Wformat=2 # Enhanced format string warnings
@@ -84,6 +83,7 @@ add_compile_definitions(_POSIX_C_SOURCE=200809L _XOPEN_SOURCE=700 _GNU_SOURCE)
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
   add_compile_options(
     -Warith-conversion # Implicit conversions in arithmetic
+    -Wdisabled-optimization # Optimization disabled
     -Wduplicated-branches # Identical if/else branches
     -Wduplicated-cond # Duplicated conditions in if/else chains
     -Wjump-misses-init # goto skips variable initialization
@@ -116,6 +116,24 @@ endif()
 # ##############################################################################
 # Compiler Hardening Flags
 
+# Stack unwinding tables (required for backtraces/debugging)
+check_c_compiler_flag(-fasynchronous-unwind-tables HAVE_UNWIND_TABLES)
+if(HAVE_UNWIND_TABLES)
+  add_compile_options(-fasynchronous-unwind-tables)
+  message(STATUS "Unwind tables: enabled")
+else()
+  message(WARNING "Compiler does not support -fasynchronous-unwind-tables")
+endif()
+
+# Frame pointer (aid debugging and profiling)
+check_c_compiler_flag(-fno-omit-frame-pointer HAVE_FRAME_POINTER)
+if(HAVE_FRAME_POINTER)
+  add_compile_options(-fno-omit-frame-pointer)
+  message(STATUS "Frame pointer: enabled")
+else()
+  message(WARNING "Compiler does not support -fno-omit-frame-pointer")
+endif()
+
 # Stack protector: ALL
 check_c_compiler_flag(-fstack-protector-all HAVE_SSP_ALL)
 if (HAVE_SSP_ALL)
@@ -133,18 +151,28 @@ else ()
   message(WARNING "Stack clash protection not supported by compiler")
 endif()
 
-# Disable stack slot reuse
+# Disable stack slot reuse (GCC-only feature; warn if unsupported)
 CHECK_C_COMPILER_FLAG(-fstack-reuse=none STACK_REUSE)
 if (STACK_REUSE)
   add_compile_options(-fstack-reuse=none)
 else ()
-  message(FATAL_ERROR "Required compiler flag '-fstack-reuse=none' not supported")
+  message(
+    WARNING "Stack slot reuse protection (-fstack-reuse=none) not supported by compiler")
 endif()
 
-# Zero call-used registers on return
+# Zero call-used registers on return. Prefer 'all' (strongest); fall back to
+# 'used', which the 'all' form accepts on GCC but Clang only supports directly.
 check_c_compiler_flag(-fzero-call-used-regs=all HAVE_ZERO_CALL_REGS)
-if (HAVE_ZERO_CALL_REGS)
+if(HAVE_ZERO_CALL_REGS)
   add_compile_options(-fzero-call-used-regs=all)
+else()
+  check_c_compiler_flag(-fzero-call-used-regs=used HAVE_ZERO_CALL_REGS_USED)
+  if(HAVE_ZERO_CALL_REGS_USED)
+    message(STATUS "Zero call-used registers: using 'used' fallback")
+    add_compile_options(-fzero-call-used-regs=used)
+  else()
+    message(WARNING "Zero call-used registers protection not supported by compiler")
+  endif()
 endif()
 
 # Control-flow enforcement
@@ -177,23 +205,60 @@ endif()
 add_link_options(
   -Wl,--as-needed       # Only link used symbols
   -Wl,-z,noexecstack    # Mark stack as non-executable
+  -Wl,-z,nodump         # Prevent dumping of the executable
   -Wl,-z,relro          # Read-only relocations
   -Wl,-z,now            # Resolve all symbols at load time
   -Wl,-z,combreloc      # Combine relocation sections
 )
 
 # ##############################################################################
+# Source Fortification
+# _FORTIFY_SOURCE hardens libc string/memory calls. It requires optimization,
+# so it is only enabled when the build actually optimizes; under -O0 gcc/clang
+# warn, and -Werror would reject that warning. Only the active build type's
+# flags (and base CMAKE_C_FLAGS) are inspected, not the always-populated
+# config cache entries for the other build types.
+set(_HAVE_OPTIMIZATION FALSE)
+if(CMAKE_C_FLAGS MATCHES "-O[1-3s]")
+  set(_HAVE_OPTIMIZATION TRUE)
+endif()
+if(DEFINED CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE STREQUAL "")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _CFG_UPPER)
+  if(CMAKE_C_FLAGS_${_CFG_UPPER} MATCHES "-O[1-3s]")
+    set(_HAVE_OPTIMIZATION TRUE)
+  endif()
+endif()
+if(_HAVE_OPTIMIZATION)
+  add_compile_definitions(_FORTIFY_SOURCE=2)
+  message(STATUS "Source fortification: enabled")
+else()
+  message(STATUS "Source fortification: disabled (no optimization)")
+endif()
+
+# ##############################################################################
 # Find our source code version string
+# Determine the project version. Prefer the latest git tag; fall back to a
+# placeholder when building from a source tree without tags (e.g. CI or an
+# unpacked archive) so configuration still succeeds. An explicit -DVERSION, as
+# the RPM spec passes via rpmbuild, always takes precedence.
 if(NOT DEFINED VERSION OR VERSION STREQUAL "")
   execute_process(
     COMMAND git describe --tags --abbrev=0
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    OUTPUT_VARIABLE VERSION
-    OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
-    RESULT_VARIABLE GIT_RESULT)
+    OUTPUT_VARIABLE _version_git
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+    RESULT_VARIABLE _version_result)
 
-  if(GIT_RESULT OR VERSION STREQUAL "")
-    message(FATAL_ERROR "Could not identify version")
+  if(_version_result EQUAL 0 AND NOT _version_git STREQUAL "")
+    set(VERSION "${_version_git}")
+    message(STATUS "Project version: ${VERSION} (from git tag)")
+  else()
+    message(
+      WARNING
+        "No git tag found; using placeholder version '0.0.0'. Tag a release to set a real version."
+      )
+    set(VERSION "0.0.0")
   endif()
 endif()
 
