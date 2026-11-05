@@ -78,10 +78,8 @@ enum { MOCK_FD = 42 };
 int _mock_pam_syslog_calls = 0;
 int _mock_pam_syslog_last_pri = 0;
 
-void __wrap_pam_syslog(const pam_handle_t *pamh, int priority, const char *fmt,
-                       ...) __attribute__((used, noinline));
-void __wrap_pam_syslog(const pam_handle_t *pamh, int priority, const char *fmt,
-                       ...) {
+void __wrap_pam_syslog(const pam_handle_t *pamh, int priority, const char *fmt, ...) __attribute__((used, noinline));
+void __wrap_pam_syslog(const pam_handle_t *pamh, int priority, const char *fmt, ...) {
   (void)pamh;
   (void)fmt;
   _mock_pam_syslog_calls++;
@@ -127,8 +125,7 @@ static struct {
   char pw_name[256];
 } _cfg_getpwnam_r;
 
-static int mock_getpwnam_r(const char *name, struct passwd *pw, char *buf,
-                           size_t buflen, struct passwd **result) {
+static int mock_getpwnam_r(const char *name, struct passwd *pw, char *buf, size_t buflen, struct passwd **result) {
   (void)name;
 
   if (_cfg_getpwnam_r.rc != 0) {
@@ -165,8 +162,8 @@ static int mock_getpwnam_r(const char *name, struct passwd *pw, char *buf,
  */
 
 static struct {
-  int fail;        /* 1 = return -1 / EACCES */
-  int last_flags;  /* flags argument from the most recent call */
+  int fail;       /* 1 = return -1 / EACCES */
+  int last_flags; /* flags argument from the most recent call */
 } _cfg_open;
 
 static int mock_open(const char *path, int flags, ...) {
@@ -266,8 +263,7 @@ static struct {
   char hash[CRYPT_OUTPUT_SIZE]; /* pre-computed expected hash */
 } _cfg_crypt_r;
 
-static char *mock_crypt_r(const char *phrase, const char *setting,
-                          struct crypt_data *data) {
+static char *mock_crypt_r(const char *phrase, const char *setting, struct crypt_data *data) {
   (void)phrase;
   (void)setting;
 
@@ -386,8 +382,7 @@ static void cfg_overlong_home_dir(void) {
    * encoding errors and the scratch buffer is large enough to avoid
    * truncation, so the return value is non-negative.
    */
-  suffix_len = (size_t)snprintf(scratch, sizeof(scratch), "/%s/%s",
-                                VNC_PASSWD_DIR, VNC_PASSWD_FILENAME);
+  suffix_len = (size_t)snprintf(scratch, sizeof(scratch), "/%s/%s", VNC_PASSWD_DIR, VNC_PASSWD_FILENAME);
 
   /*
    * dir_len + suffix_len == PATH_MAX, so snprintf returns PATH_MAX,
@@ -514,8 +509,7 @@ TEST(auth_user_not_found) {
 
   _cfg_getpwnam_r.no_result = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "nobody", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN,
-                 "missing user must return PAM_USER_UNKNOWN");
+  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "missing user must return PAM_USER_UNKNOWN");
 }
 
 TEST(auth_getpwnam_r_error) {
@@ -524,8 +518,7 @@ TEST(auth_getpwnam_r_error) {
 
   _cfg_getpwnam_r.rc = ENOENT;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN,
-                 "getpwnam_r error must return PAM_USER_UNKNOWN");
+  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "getpwnam_r error must return PAM_USER_UNKNOWN");
 }
 
 /* ============================================================================
@@ -565,8 +558,7 @@ TEST(auth_home_dir_null) {
 
   _cfg_getpwnam_r.pw_dir_null = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN,
-                 "NULL pw_dir must return PAM_USER_UNKNOWN");
+  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "NULL pw_dir must return PAM_USER_UNKNOWN");
 }
 
 TEST(auth_home_dir_root_slash) {
@@ -576,8 +568,7 @@ TEST(auth_home_dir_root_slash) {
 
   snprintf(_cfg_getpwnam_r.pw_dir, PATH_MAX, "/");
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN,
-                 "home dir '/' must return PAM_USER_UNKNOWN");
+  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "home dir '/' must return PAM_USER_UNKNOWN");
 }
 
 TEST(auth_home_dir_empty) {
@@ -586,8 +577,7 @@ TEST(auth_home_dir_empty) {
 
   _cfg_getpwnam_r.pw_dir[0] = '\0';
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN,
-                 "empty home dir must return PAM_USER_UNKNOWN");
+  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "empty home dir must return PAM_USER_UNKNOWN");
 }
 
 TEST(auth_home_dir_relative) {
@@ -596,8 +586,7 @@ TEST(auth_home_dir_relative) {
 
   snprintf(_cfg_getpwnam_r.pw_dir, PATH_MAX, "home/user");
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN,
-                 "relative home dir must return PAM_USER_UNKNOWN");
+  TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "relative home dir must return PAM_USER_UNKNOWN");
 }
 
 /* ============================================================================
@@ -617,8 +606,7 @@ TEST(auth_passwd_path_build_fails) {
 
   cfg_overlong_home_dir();
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTH_ERR,
-                 "overlong home dir must return PAM_AUTH_ERR");
+  TEST_ASSERT_EQ(rc, PAM_AUTH_ERR, "overlong home dir must return PAM_AUTH_ERR");
 }
 
 /* ============================================================================
@@ -632,8 +620,7 @@ TEST(auth_passwd_file_open_fails) {
 
   _cfg_open.fail = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "open failure must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "open failure must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_fstat_fails) {
@@ -642,8 +629,7 @@ TEST(auth_passwd_file_fstat_fails) {
 
   _cfg_fstat.fail = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "fstat failure must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "fstat failure must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_wrong_owner) {
@@ -652,8 +638,7 @@ TEST(auth_passwd_file_wrong_owner) {
 
   _cfg_fstat.st_uid = getuid() + 1; /* owner != process uid */
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "wrong file owner must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "wrong file owner must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_is_directory) {
@@ -662,8 +647,7 @@ TEST(auth_passwd_file_is_directory) {
 
   _cfg_fstat.st_mode = S_IFDIR | 0600; /* directory, not regular file */
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "directory must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "directory must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_open_missing_o_nofollow) {
@@ -678,8 +662,7 @@ TEST(auth_passwd_file_open_missing_o_nofollow) {
   cfg_happy_crypt();
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "secret", false);
   TEST_ASSERT_EQ(rc, PAM_SUCCESS, "happy path must still succeed");
-  TEST_ASSERT_EQ(_cfg_open.last_flags & O_NOFOLLOW, 0,
-                     "open() must not include O_NOFOLLOW");
+  TEST_ASSERT_EQ(_cfg_open.last_flags & O_NOFOLLOW, 0, "open() must not include O_NOFOLLOW");
 }
 
 TEST(auth_passwd_file_is_symlink) {
@@ -699,8 +682,7 @@ TEST(auth_passwd_file_is_symlink) {
   _cfg_open.fail = 1;
   errno = ELOOP;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "ELOOP from open() must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "ELOOP from open() must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_group_readable) {
@@ -709,8 +691,7 @@ TEST(auth_passwd_file_group_readable) {
 
   _cfg_fstat.st_mode = S_IFREG | 0640; /* group-readable: rejected */
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "group-readable file must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "group-readable file must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_world_readable) {
@@ -719,8 +700,7 @@ TEST(auth_passwd_file_world_readable) {
 
   _cfg_fstat.st_mode = S_IFREG | 0604; /* world-readable: rejected */
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "world-readable file must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "world-readable file must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_passwd_file_user_executable) {
@@ -729,8 +709,7 @@ TEST(auth_passwd_file_user_executable) {
 
   _cfg_fstat.st_mode = S_IFREG | 0700; /* executable: rejected */
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "executable file must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "executable file must return PAM_AUTHINFO_UNAVAIL");
 }
 
 /* ============================================================================
@@ -744,8 +723,7 @@ TEST(auth_fdopen_fails) {
 
   _cfg_fdopen.fail = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "fdopen failure must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "fdopen failure must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_fgets_returns_null) {
@@ -754,8 +732,7 @@ TEST(auth_fgets_returns_null) {
 
   _cfg_fgets.fail = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "fgets NULL must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "fgets NULL must return PAM_AUTHINFO_UNAVAIL");
 }
 
 TEST(auth_hash_empty_after_strip) {
@@ -768,8 +745,7 @@ TEST(auth_hash_empty_after_strip) {
 
   snprintf(_cfg_fgets.content, sizeof(_cfg_fgets.content), "   \n");
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", false);
-  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL,
-                 "whitespace-only hash must return PAM_AUTHINFO_UNAVAIL");
+  TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "whitespace-only hash must return PAM_AUTHINFO_UNAVAIL");
 }
 
 /* ============================================================================
@@ -807,8 +783,7 @@ TEST(auth_password_mismatch) {
 
   cfg_happy_crypt();
   /* Override crypt_r output to differ from what fgets delivered. */
-  snprintf(_cfg_crypt_r.hash, sizeof(_cfg_crypt_r.hash),
-           "$6$rounds=65536$testsalt$DIFFERENT");
+  snprintf(_cfg_crypt_r.hash, sizeof(_cfg_crypt_r.hash), "$6$rounds=65536$testsalt$DIFFERENT");
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "wrongpass", false);
   TEST_ASSERT_EQ(rc, PAM_AUTH_ERR, "hash mismatch must return PAM_AUTH_ERR");
 }
@@ -838,8 +813,7 @@ TEST(auth_hash_trailing_newline_stripped) {
 
   cfg_happy_crypt();
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "secret", false);
-  TEST_ASSERT_EQ(rc, PAM_SUCCESS,
-                 "trailing newline must be stripped before comparison");
+  TEST_ASSERT_EQ(rc, PAM_SUCCESS, "trailing newline must be stripped before comparison");
 }
 
 TEST(auth_hash_trailing_cr_stripped) {
@@ -850,8 +824,7 @@ TEST(auth_hash_trailing_cr_stripped) {
   cfg_happy_crypt();
   snprintf(_cfg_fgets.content, sizeof(_cfg_fgets.content), "%s\r\n", TEST_HASH);
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "secret", false);
-  TEST_ASSERT_EQ(rc, PAM_SUCCESS,
-                 "trailing CRLF must be stripped before comparison");
+  TEST_ASSERT_EQ(rc, PAM_SUCCESS, "trailing CRLF must be stripped before comparison");
 }
 
 /* ============================================================================
@@ -874,8 +847,7 @@ TEST(debug_false_emits_no_log_on_success) {
   cfg_happy_crypt();
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "secret", false);
   TEST_ASSERT_EQ(rc, PAM_SUCCESS, "must succeed");
-  TEST_ASSERT_EQ(_mock_pam_syslog_calls, 0,
-                 "debug=false must not call pam_syslog");
+  TEST_ASSERT_EQ(_mock_pam_syslog_calls, 0, "debug=false must not call pam_syslog");
 }
 
 TEST(debug_true_emits_log_on_success) {
@@ -885,8 +857,7 @@ TEST(debug_true_emits_log_on_success) {
   cfg_happy_crypt();
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "secret", true);
   TEST_ASSERT_EQ(rc, PAM_SUCCESS, "must succeed");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must call pam_syslog at least once");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must call pam_syslog at least once");
 }
 
 TEST(debug_true_user_not_found) {
@@ -896,8 +867,7 @@ TEST(debug_true_user_not_found) {
   _cfg_getpwnam_r.no_result = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "nobody", "pass", true);
   TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "must return PAM_USER_UNKNOWN");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log on user-not-found path");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log on user-not-found path");
 }
 
 TEST(debug_true_uid_mismatch) {
@@ -907,8 +877,7 @@ TEST(debug_true_uid_mismatch) {
   _cfg_getpwnam_r.uid = getuid() + 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", true);
   TEST_ASSERT_EQ(rc, PAM_AUTH_ERR, "must return PAM_AUTH_ERR");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log session binding failure");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log session binding failure");
 }
 
 TEST(debug_true_home_dir_null) {
@@ -922,8 +891,7 @@ TEST(debug_true_home_dir_null) {
   _cfg_getpwnam_r.pw_dir_null = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", true);
   TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "must return PAM_USER_UNKNOWN");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log NULL home dir");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log NULL home dir");
 }
 
 TEST(debug_true_home_dir_root) {
@@ -933,8 +901,7 @@ TEST(debug_true_home_dir_root) {
   snprintf(_cfg_getpwnam_r.pw_dir, PATH_MAX, "/");
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", true);
   TEST_ASSERT_EQ(rc, PAM_USER_UNKNOWN, "must return PAM_USER_UNKNOWN");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log invalid home dir");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log invalid home dir");
 }
 
 TEST(debug_true_passwd_path_build_fails) {
@@ -943,10 +910,8 @@ TEST(debug_true_passwd_path_build_fails) {
 
   cfg_overlong_home_dir();
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", true);
-  TEST_ASSERT_EQ(rc, PAM_AUTH_ERR,
-                 "overlong home dir (debug) must return PAM_AUTH_ERR");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log build_vnc_passwd_path failure");
+  TEST_ASSERT_EQ(rc, PAM_AUTH_ERR, "overlong home dir (debug) must return PAM_AUTH_ERR");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log build_vnc_passwd_path failure");
 }
 
 TEST(debug_true_file_open_fails) {
@@ -956,8 +921,7 @@ TEST(debug_true_file_open_fails) {
   _cfg_open.fail = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", true);
   TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "must return PAM_AUTHINFO_UNAVAIL");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log file validation failure");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log file validation failure");
 }
 
 TEST(debug_true_fgets_fails) {
@@ -967,8 +931,7 @@ TEST(debug_true_fgets_fails) {
   _cfg_fgets.fail = 1;
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "pass", true);
   TEST_ASSERT_EQ(rc, PAM_AUTHINFO_UNAVAIL, "must return PAM_AUTHINFO_UNAVAIL");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log hash read failure");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log hash read failure");
 }
 
 TEST(debug_true_password_mismatch) {
@@ -976,12 +939,10 @@ TEST(debug_true_password_mismatch) {
   int rc;
 
   cfg_happy_crypt();
-  snprintf(_cfg_crypt_r.hash, sizeof(_cfg_crypt_r.hash),
-           "$6$rounds=65536$testsalt$DIFFERENT");
+  snprintf(_cfg_crypt_r.hash, sizeof(_cfg_crypt_r.hash), "$6$rounds=65536$testsalt$DIFFERENT");
   rc = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "wrongpass", true);
   TEST_ASSERT_EQ(rc, PAM_AUTH_ERR, "must return PAM_AUTH_ERR");
-  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0,
-                     "debug=true must log verification failure");
+  TEST_ASSERT_NOT_EQ(_mock_pam_syslog_calls, 0, "debug=true must log verification failure");
 }
 
 TEST(debug_log_priority_is_debug) {
@@ -994,8 +955,7 @@ TEST(debug_log_priority_is_debug) {
 
   cfg_happy_crypt();
   ret = authenticate_vnc_user(&ops, DUMMY_PAMH, "user", "secret", true);
-  TEST_ASSERT_EQ(_mock_pam_syslog_last_pri, LOG_DEBUG,
-                 "all debug log calls must use LOG_DEBUG priority");
+  TEST_ASSERT_EQ(_mock_pam_syslog_last_pri, LOG_DEBUG, "all debug log calls must use LOG_DEBUG priority");
   TEST_ASSERT_EQ(ret, 0, "should not error");
 }
 

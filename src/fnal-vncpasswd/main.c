@@ -43,8 +43,7 @@
  */
 
 static void print_help(void) __attribute__((cold));
-static int read_password(char *buf, size_t buflen)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1)));
+static int read_password(char *buf, size_t buflen) __attribute__((warn_unused_result)) __attribute__((nonnull(1)));
 
 /* Help */
 
@@ -55,8 +54,7 @@ static void print_help(void) {
   (void)printf("Version: %s\n", VERSION);
   (void)printf("\n");
   (void)printf("Set the VNC password used by pam_fnal_vncpasswd.\n");
-  if (build_vnc_passwd_path("~", passwd_display_path,
-                            sizeof(passwd_display_path)) == 0) {
+  if (build_vnc_passwd_path("~", passwd_display_path, sizeof(passwd_display_path)) == 0) {
     (void)printf("\n");
     (void)printf("Password file path: %s\n", passwd_display_path);
   }
@@ -96,8 +94,7 @@ static int read_password(char *buf, size_t buflen) {
     return -1;
   }
 
-  if (readpassphrase("New VNC password: ", buf, buflen,
-                     RPP_ECHO_OFF | RPP_REQUIRE_TTY) == NULL) {
+  if (readpassphrase("New VNC password: ", buf, buflen, RPP_ECHO_OFF | RPP_REQUIRE_TTY) == NULL) {
     (void)fprintf(stderr, "Error reading password.\n");
     errno = EIO;
     return -1;
@@ -106,23 +103,20 @@ static int read_password(char *buf, size_t buflen) {
   n1 = strlen(buf);
 
   if (n1 < (size_t)VNC_MIN_PASSWORD_LENGTH) {
-    (void)fprintf(stderr, "Password too short (minimum %d characters).\n",
-                  VNC_MIN_PASSWORD_LENGTH);
+    (void)fprintf(stderr, "Password too short (minimum %d characters).\n", VNC_MIN_PASSWORD_LENGTH);
     explicit_bzero(buf, buflen);
     errno = EINVAL;
     return -1;
   }
 
   if (n1 > (size_t)VNC_MAX_PASSWORD_LENGTH) {
-    (void)fprintf(stderr, "Password too long (maximum %d characters).\n",
-                  VNC_MAX_PASSWORD_LENGTH);
+    (void)fprintf(stderr, "Password too long (maximum %d characters).\n", VNC_MAX_PASSWORD_LENGTH);
     explicit_bzero(buf, buflen);
     errno = EINVAL;
     return -1;
   }
 
-  if (readpassphrase("Confirm VNC password: ", confirm, sizeof(confirm),
-                     RPP_ECHO_OFF | RPP_REQUIRE_TTY) == NULL) {
+  if (readpassphrase("Confirm VNC password: ", confirm, sizeof(confirm), RPP_ECHO_OFF | RPP_REQUIRE_TTY) == NULL) {
     explicit_bzero(buf, buflen);
     explicit_bzero(confirm, sizeof(confirm));
     (void)fprintf(stderr, "Error reading confirmation.\n");
@@ -152,10 +146,7 @@ int main(int argc, char *argv[]) {
   char password[VNC_MAX_PASSWORD_LENGTH + 2] = {0};
   char hash[VNC_HASH_BUF_SIZE] = {0};
 
-  static const struct option long_opts[] = {
-      {"help", no_argument, NULL, 'h'},
-      {"version", no_argument, NULL, 1000},
-      {NULL, 0, NULL, 0}};
+  static const struct option long_opts[] = {{"help", no_argument, NULL, 'h'}, {"version", no_argument, NULL, 1000}, {NULL, 0, NULL, 0}};
 
   while ((opt = getopt_long(argc, argv, "h", long_opts, NULL)) != -1) {
     switch (opt) {
@@ -171,10 +162,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (get_passwd_path(&syscall_ops_default, getuid(), passwd_path,
-                      sizeof(passwd_path)) < 0) {
-    (void)fprintf(stderr, "Cannot determine password file path: %s\n",
-                  strerror(errno));
+  if (get_passwd_path(&syscall_ops_default, getuid(), passwd_path, sizeof(passwd_path)) < 0) {
+    (void)fprintf(stderr, "Cannot determine password file path: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
 
@@ -192,8 +181,7 @@ int main(int argc, char *argv[]) {
   explicit_bzero(password, sizeof(password));
 
   if (atomic_write_passwd_file(&syscall_ops_default, passwd_path, hash) < 0) {
-    (void)fprintf(stderr, "Failed to write %s: %s\n", passwd_path,
-                  strerror(errno));
+    (void)fprintf(stderr, "Failed to write %s: %s\n", passwd_path, strerror(errno));
     explicit_bzero(hash, sizeof(hash));
     exit(EXIT_FAILURE);
   }

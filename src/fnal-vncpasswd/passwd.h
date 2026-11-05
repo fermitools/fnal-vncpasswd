@@ -37,8 +37,7 @@
  *
  * Returns 0 on success, -1 on error (errno set).
  */
-int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf,
-                    size_t buflen) __attribute__((warn_unused_result));
+int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf, size_t buflen) __attribute__((warn_unused_result));
 
 /*
  * hash_password - Hash a plaintext password using crypt_r(3).
@@ -64,9 +63,7 @@ int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf,
  *
  * Returns 0 on success, -1 on error (errno set).
  */
-int hash_password(const struct syscall_ops *ops, const char *password,
-                  char *hash_buf, size_t hash_len)
-    __attribute__((warn_unused_result));
+int hash_password(const struct syscall_ops *ops, const char *password, char *hash_buf, size_t hash_len) __attribute__((warn_unused_result));
 
 /*
  * ensure_vnc_dir - Create the VNC configuration directory if absent.
@@ -87,8 +84,7 @@ int hash_password(const struct syscall_ops *ops, const char *password,
  *
  * Returns 0 on success, -1 on error (errno set).
  */
-int ensure_vnc_dir(const struct syscall_ops *ops, const char *path)
-    __attribute__((warn_unused_result));
+int ensure_vnc_dir(const struct syscall_ops *ops, const char *path) __attribute__((warn_unused_result));
 
 /*
  * atomic_write_passwd_file - Atomically replace the VNC password file.
@@ -111,8 +107,6 @@ int ensure_vnc_dir(const struct syscall_ops *ops, const char *path)
  *
  * Returns 0 on success, -1 on error (errno set).
  */
-int atomic_write_passwd_file(const struct syscall_ops *ops, const char *path,
-                             const char *hash)
-    __attribute__((warn_unused_result));
+int atomic_write_passwd_file(const struct syscall_ops *ops, const char *path, const char *hash) __attribute__((warn_unused_result));
 
 #endif /* FNAL_VNCPASSWD_PASSWD_H */

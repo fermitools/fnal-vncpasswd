@@ -36,8 +36,7 @@ struct pam_args {
  * Inline so callers pay no call overhead and the compiler can see the
  * initial values.
  */
-static inline struct pam_args make_pam_args(void)
-    __attribute__((warn_unused_result));
+static inline struct pam_args make_pam_args(void) __attribute__((warn_unused_result));
 static inline struct pam_args make_pam_args(void) {
   return (struct pam_args){
       .debug = false,
@@ -102,9 +101,6 @@ void parse_pam_args(int argc, const char **argv, struct pam_args *args);
  * Returns a PAM return code (PAM_SUCCESS, PAM_AUTH_ERR, PAM_USER_UNKNOWN,
  * etc.).
  */
-int authenticate_vnc_user(const struct syscall_ops *ops,
-                          const pam_handle_t *pamh, const char *username,
-                          const char *password, bool debug)
-    __attribute__((warn_unused_result));
+int authenticate_vnc_user(const struct syscall_ops *ops, const pam_handle_t *pamh, const char *username, const char *password, bool debug) __attribute__((warn_unused_result));
 
 #endif /* AUTH_H */

@@ -21,8 +21,7 @@
 #include "autoconf.h"
 #include "syscall_ops.h"
 
-PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc,
-                                   const char **argv) {
+PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   const char *username = NULL;
   const char *authtok = NULL;
   struct pam_args args = make_pam_args();
@@ -36,14 +35,12 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc,
     return PAM_AUTH_ERR;
   }
 
-  if (pam_get_authtok(pamh, PAM_AUTHTOK, &authtok, NULL) != PAM_SUCCESS ||
-      authtok == NULL) {
+  if (pam_get_authtok(pamh, PAM_AUTHTOK, &authtok, NULL) != PAM_SUCCESS || authtok == NULL) {
     pam_syslog(pamh, LOG_ERR, "pam_fnal_vncpasswd: could not get password");
     return PAM_AUTH_ERR;
   }
 
-  return authenticate_vnc_user(&syscall_ops_default, pamh, username, authtok,
-                               args.debug);
+  return authenticate_vnc_user(&syscall_ops_default, pamh, username, authtok, args.debug);
 }
 
 /*
@@ -51,8 +48,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc,
  * that setcred is not applicable here, avoiding interference with stacked
  * modules that inspect setcred return values.
  */
-PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc,
-                              const char **argv) {
+PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)pamh;
   (void)flags;
   (void)argc;
@@ -61,8 +57,7 @@ PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc,
 }
 
 /* Password changes are not supported; use fnal-vncpasswd instead. */
-PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc,
-                                const char **argv) {
+PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)flags;
   (void)argc;
   (void)argv;
@@ -76,8 +71,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc,
  * This module implements only password authentication. Placing it in other
  * elements of the PAM stack will return PAM_SERVICE_ERR.
  */
-PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc,
-                                const char **argv) {
+PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)flags;
   (void)argc;
   (void)argv;
@@ -87,8 +81,7 @@ PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc,
   return PAM_SERVICE_ERR;
 }
 
-PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc,
-                                   const char **argv) {
+PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)flags;
   (void)argc;
   (void)argv;
@@ -98,8 +91,7 @@ PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc,
   return PAM_SERVICE_ERR;
 }
 
-PAM_EXTERN int pam_sm_close_session(pam_handle_t *pamh, int flags, int argc,
-                                    const char **argv) {
+PAM_EXTERN int pam_sm_close_session(pam_handle_t *pamh, int flags, int argc, const char **argv) {
   (void)flags;
   (void)argc;
   (void)argv;

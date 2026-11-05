@@ -47,20 +47,13 @@ static int noop_selinux_log(int type, const char *fmt, ...) {
  * public entry point validates its pointer arguments before delegating.
  */
 
-static int crypt_and_copy(const struct syscall_ops *ops,
-                          char salt[static CRYPT_GENSALT_OUTPUT_SIZE],
-                          const char *password, char *hash_buf, size_t hash_len)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2, 3, 4)));
+static int crypt_and_copy(const struct syscall_ops *ops, char salt[static CRYPT_GENSALT_OUTPUT_SIZE], const char *password, char *hash_buf, size_t hash_len) __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2, 3, 4)));
 
-static const char *select_prefix(const struct syscall_ops *ops)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1)));
+static const char *select_prefix(const struct syscall_ops *ops) __attribute__((warn_unused_result)) __attribute__((nonnull(1)));
 
-static int generate_salt(const struct syscall_ops *ops, char *salt_buf,
-                         size_t salt_len) __attribute__((warn_unused_result))
-    __attribute__((nonnull(1, 2)));
+static int generate_salt(const struct syscall_ops *ops, char *salt_buf, size_t salt_len) __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
 
-static int make_one_dir(const struct syscall_ops *ops, const char *path)
-    __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
+static int make_one_dir(const struct syscall_ops *ops, const char *path) __attribute__((warn_unused_result)) __attribute__((nonnull(1, 2)));
 
 /*
  * Algorithm preference list for select_prefix().
@@ -83,7 +76,7 @@ static int make_one_dir(const struct syscall_ops *ops, const char *path)
  * no plans to do so. A future RHEL dropping an entry causes select_prefix() to
  * skip it harmlessly via a NULL return from crypt_gensalt_ra().
  */
-static const char * const salt_prefixes[] = {
+static const char *const salt_prefixes[] = {
     NULL,   /* libxcrypt compiled-in default */
     "$y$",  /* yescrypt */
     "$2b$", /* bcrypt */
@@ -103,8 +96,7 @@ _Static_assert(SALT_PREFIXES_COUNT > 0, "salt_prefixes must not be empty");
  * @buflen: Size of @buf. PATH_MAX is always sufficient.
  */
 
-int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf,
-                    size_t buflen) {
+int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf, size_t buflen) {
   char vnc_dir[PATH_MAX] = {0};
   struct passwd pw = {0};
   struct passwd *pwresult = NULL;
@@ -146,8 +138,7 @@ int get_passwd_path(const struct syscall_ops *ops, uid_t uid, char *buf,
    * ensure_vnc_dir() must complete before we free pwbuf.
    */
   // LCOV_EXCL_START - tested extensivly elsewhere
-  if (build_vnc_dir_path(pw.pw_dir, vnc_dir, sizeof(vnc_dir)) < 0 ||
-      ensure_vnc_dir(ops, vnc_dir) < 0) {
+  if (build_vnc_dir_path(pw.pw_dir, vnc_dir, sizeof(vnc_dir)) < 0 || ensure_vnc_dir(ops, vnc_dir) < 0) {
     free(pwbuf);
     return -1;
   }
@@ -209,8 +200,7 @@ static const char *select_prefix(const struct syscall_ops *ops) {
  *
  * Returns 0 on success, -1 on error (errno set).
  */
-static int generate_salt(const struct syscall_ops *ops, char *salt_buf,
-                         size_t salt_len) {
+static int generate_salt(const struct syscall_ops *ops, char *salt_buf, size_t salt_len) {
   char *salt = NULL;
   size_t slen = 0;
 
@@ -260,10 +250,7 @@ static int generate_salt(const struct syscall_ops *ops, char *salt_buf,
  *
  * Returns 0 on success, -1 on error (errno set).
  */
-static int crypt_and_copy(const struct syscall_ops *ops,
-                          char salt[static CRYPT_GENSALT_OUTPUT_SIZE],
-                          const char *password, char *hash_buf,
-                          size_t hash_len) {
+static int crypt_and_copy(const struct syscall_ops *ops, char salt[static CRYPT_GENSALT_OUTPUT_SIZE], const char *password, char *hash_buf, size_t hash_len) {
   struct crypt_data cd = {0};
   char *result = NULL;
   int n = 0;
@@ -302,12 +289,10 @@ static int crypt_and_copy(const struct syscall_ops *ops,
  * @hash_buf: Output buffer; VNC_HASH_BUF_SIZE bytes is always sufficient.
  * @hash_len: Size of @hash_buf.
  */
-int hash_password(const struct syscall_ops *ops, const char *password,
-                  char *hash_buf, size_t hash_len) {
+int hash_password(const struct syscall_ops *ops, const char *password, char *hash_buf, size_t hash_len) {
   char salt[CRYPT_GENSALT_OUTPUT_SIZE] = {0};
 
-  if (ops == NULL || password == NULL || hash_buf == NULL ||
-      password[0] == '\0' || hash_len == 0) {
+  if (ops == NULL || password == NULL || hash_buf == NULL || password[0] == '\0' || hash_len == 0) {
     errno = EINVAL;
     return -1;
   }
@@ -407,8 +392,7 @@ int ensure_vnc_dir(const struct syscall_ops *ops, const char *path) {
    * ensured above.
    */
   plen = strlen(path);
-  if (strstr(path, "/../") != NULL ||
-      (plen >= 3 && strcmp(path + plen - 3, "/..") == 0)) {
+  if (strstr(path, "/../") != NULL || (plen >= 3 && strcmp(path + plen - 3, "/..") == 0)) {
     errno = EINVAL;
     return -1;
   }
@@ -450,8 +434,7 @@ int ensure_vnc_dir(const struct syscall_ops *ops, const char *path) {
  * @path: Destination path for the password file.
  * @hash: crypt(3) hash string to write (NUL-terminated).
  */
-int atomic_write_passwd_file(const struct syscall_ops *ops, const char *path,
-                             const char *hash) {
+int atomic_write_passwd_file(const struct syscall_ops *ops, const char *path, const char *hash) {
   char tmp_path[PATH_MAX] = {0};
   char line[CRYPT_OUTPUT_SIZE + 2] = {0}; /* hash + '\n' + '\0' */
   int fd = -1;
@@ -551,7 +534,7 @@ int atomic_write_passwd_file(const struct syscall_ops *ops, const char *path,
   {
     /* quietly suppress all selinux messages for systems where selinux=0 */
     union selinux_callback cb_saved = selinux_get_callback(SELINUX_CB_LOG);
-    union selinux_callback cb_suppress = { .func_log = noop_selinux_log };
+    union selinux_callback cb_suppress = {.func_log = noop_selinux_log};
     selinux_set_callback(SELINUX_CB_LOG, cb_suppress);
     (void)selinux_restorecon(path, SELINUX_RESTORECON_IGNORE_DIGEST); /* --force */
     selinux_set_callback(SELINUX_CB_LOG, cb_saved);
